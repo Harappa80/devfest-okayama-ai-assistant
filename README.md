@@ -6,7 +6,7 @@
 
 ## 進め方
 
-1. [準備する](#step-1)：API キーを取得し、Cloud Shell を開く
+1. [準備する](#step-1)：Cloud Shell を開き、Agent Platform を使うプロジェクトを設定する
 2. [サンプルを動かす](#step-2)：コードを取得し、ブラウザーで表示する
 3. [AI と会話できるようにする](#step-3)：Gemini CLI で `character.py` を作る
 4. [性格と口調を変える](#step-4)：自分だけのキャラクターにする
@@ -21,11 +21,12 @@
 - インターネットに接続できるパソコン
 - Google Chrome（音声の読み上げを確認するために使います）
 - Google アカウント。資料と同じく、個人のアカウントで進めることをおすすめします
+- 課金が有効な Google Cloud プロジェクトと、Gemini Enterprise Agent Platform を利用する権限
 - 音声を確認できるイヤホンまたはスピーカー
 
-Google AI Studio、Cloud Shell、Gemini アプリに同じアカウントでログインしておくと進めやすくなります。学校・会社のアカウントでは、管理者の設定によって利用できない場合があります。
+Google Cloud、Cloud Shell、Gemini アプリに同じアカウントでログインしておくと進めやすくなります。学校・会社のアカウントでは、管理者の設定によって利用できない場合があります。
 
-Gemini API や Google 検索には利用枠・料金が設定されています。無料で使える範囲はモデルやアカウントによって異なるため、[Google AI Studio](https://aistudio.google.com/) の利用状況と [Gemini API の料金](https://ai.google.dev/gemini-api/docs/pricing) を確認してください。
+アプリは **Gemini Enterprise Agent Platform** の Gemini モデルを使います。モデルの呼び出しや Google 検索によるグラウンディングには料金が発生する場合があります。講師と利用するプロジェクト・予算を確認してください。[料金の確認](https://cloud.google.com/products/gemini-enterprise-agent-platform/pricing)・[Agent Platform の開始手順](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/start)
 
 ### コマンドと指示文の違い
 
@@ -46,27 +47,18 @@ Gemini API や Google 検索には利用枠・料金が設定されています�
 
 ## 1. 準備する
 
-### 1-1. Gemini API キーを取得する
+### 1-1. Google Cloud プロジェクトを用意する
 
-1. Chrome で [Google AI Studio の API キー画面](https://aistudio.google.com/api-keys) を開きます。
-2. Google アカウントでログインし、初回の利用確認が表示されたら内容を確認します。
-3. 「API キーを作成（Create API key）」を選びます。初回利用時にキーが自動作成されている場合は、そのキーも利用できます。
-4. 名前やプロジェクトを求められたら、ハンズオン用の名前を入力し、利用できるプロジェクトを選んで作成します。
-5. 作成したキーをコピーします。あとで `.env` ファイルに設定します。
+講師が案内した Google Cloud プロジェクトの **プロジェクト ID** を控えます。表示名やプロジェクト番号とは異なります。自分のプロジェクトを使う場合は、[Google Cloud コンソール](https://console.cloud.google.com/) で作成・選択してください。
 
-API キー画面の右上にある「API キーを作成」を選びます。
+講師・管理者は、開催前に次の設定を済ませてください。
 
-![Google AI Studio の API キー一覧。右上に「API キーを作成」ボタンがあります。](docs/images/ai-studio-api-keys.png)
+- プロジェクトの課金を有効にする。
+- Agent Platform の API（サービス名は `aiplatform.googleapis.com`）を有効にする。
+- 参加者に、そのプロジェクトの Agent Platform User（`roles/aiplatform.user`）を付与する。既存のロールで必要な権限を持っている場合は追加不要です。
+- 使用するモデルと Google 検索の利用条件・クォータを確認する。
 
-作成画面では、キーの名前とプロジェクトを指定します。画像のプロジェクト名は一例です。
-
-<img src="docs/images/ai-studio-create-key.png" alt="キーの名前とプロジェクトを指定し、右下の「キーを作成」を押す画面例" width="680" />
-
-プロジェクトが候補に表示されない場合は、AI Studio の「Projects」から利用するプロジェクトをインポートして、API キー画面に戻ります。画面の表示や必要な操作は、アカウントによって異なります。[公式の API キー取得手順](https://ai.google.dev/gemini-api/docs/api-key) も参照してください。
-
-> API キーはパスワードのように扱います。Gemini CLI への指示文、チャット、公開リポジトリ、スクリーンショットには載せず、後述の `.env` に自分で入力してください。
-
-**確認：API キーをコピーできたら、次に進みます。**
+プロジェクトの作成・課金設定・API の有効化・権限付与には、それぞれの管理権限が必要です。権限がない場合は講師・管理者に依頼してください。このハンズオンでは API キーやサービスアカウントの秘密鍵を作成しません。[必要な権限の公式手順](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/start#permissions)
 
 ### 1-2. Cloud Shell を開く
 
@@ -88,6 +80,29 @@ python3 --version
 ```
 
 このリポジトリの依存パッケージには Python 3.11 以上が必要です。Python 3.11 または 3.12 の環境を使ってください。3.10 以下が表示された場合は、このまま進めず講師に相談してください。
+
+### 1-3. プロジェクトと認証を確認する
+
+**操作場所：** Cloud Shell のターミナル。
+
+`YOUR_GOOGLE_CLOUD_PROJECT_ID` を、利用するプロジェクト ID に置き換えて実行します。
+
+```bash
+gcloud config set project YOUR_GOOGLE_CLOUD_PROJECT_ID
+gcloud services list --enabled --filter="config.name:aiplatform.googleapis.com" --format="value(config.name)"
+```
+
+2 行目に `aiplatform.googleapis.com` と表示されれば、API は有効です。表示されない場合は、管理権限を持つ講師・管理者が次のコマンドを実行します。
+
+```bash
+gcloud services enable aiplatform.googleapis.com
+```
+
+Cloud Shell では、Python アプリの認証に Application Default Credentials（ADC）を利用できます。手順 1-2 の承認を済ませ、権限を確認したアカウントで進めてください。通常、Cloud Shell で追加の `gcloud auth application-default login` は不要です。[ADC の公式手順](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/start/gcp-auth)
+
+Cloud Shell 以外のローカル環境で実行する場合は、別途 `gcloud auth application-default login` で ADC を用意し、`gcloud auth application-default set-quota-project YOUR_GOOGLE_CLOUD_PROJECT_ID` を設定します。クォータプロジェクトの設定には `serviceusage.services.use` 権限（Service Usage Consumer、`roles/serviceusage.serviceUsageConsumer` など）が必要です。認証情報やアクセストークンをリポジトリやチャットに貼り付けないでください。
+
+**確認：利用するプロジェクトで API が有効になっていたら、次に進みます。**
 
 <a id="step-2"></a>
 
@@ -131,37 +146,40 @@ python -m pip install -r requirements.txt
 
 インストール中は文字が流れます。再びコマンドを入力できる状態に戻るまで待ちます。`ERROR` が表示された場合は、次へ進む前に [対処方法](#troubleshooting) を確認してください。
 
-### 2-3. API キーを設定する
+### 2-3. Agent Platform の接続先を設定する
 
-同じターミナルで、設定ファイルのひな形をコピーします。**このコマンドは初回だけ実行します。再実行すると、入力済みの API キーがひな形で上書きされます。**
+同じターミナルで、設定ファイルのひな形をコピーします。**このコマンドは初回だけ実行します。再実行すると、入力済みの接続設定がひな形で上書きされます。**
 
 ```bash
 cp .env.template .env
 ```
 
-次に、Cloud Shell の「エディターを開く（Open Editor）」を押します。フォルダーを選択する画面が出たら、ホームフォルダーにある `devfest-okayama-ai-assistant` を開きます。
-
-下の画面では、左側の「Open Folder」から作業フォルダーを選びます。
+Cloud Shell の「エディターを開く（Open Editor）」を押し、ホームフォルダーの `devfest-okayama-ai-assistant` を開きます。
 
 ![Cloud Shell エディターの左側にある「Open Folder」ボタン](docs/images/cloud-shell-open-folder.png)
 
 1. 左側のファイル一覧から `.env` を開きます。**`.env.template` ではありません。**
-2. `YOUR_GOOGLE_AI_STUDIO_API_KEY` の部分だけを、取得した API キーに置き換えます。
-3. `GOOGLE_GENAI_USE_VERTEXAI=False` は、そのままにします。
+2. `YOUR_GOOGLE_CLOUD_PROJECT_ID` を、手順 1-3 と同じプロジェクト ID に置き換えます。
+3. 残りの 2 行はそのままにします。
 4. `Ctrl+S`（Mac は `Command+S`）で保存します。
 
-設定する 2 行の形は次のとおりです。2 行目の値には、自分のキーを入れてください。
-
 ```dotenv
-GOOGLE_GENAI_USE_VERTEXAI=False
-GOOGLE_API_KEY=YOUR_GOOGLE_AI_STUDIO_API_KEY
+GOOGLE_GENAI_USE_VERTEXAI=True
+GOOGLE_CLOUD_PROJECT=YOUR_GOOGLE_CLOUD_PROJECT_ID
+GOOGLE_CLOUD_LOCATION=global
 ```
 
-エディターで `.env` を開いた画面例です。画像のキーはひな形の文字列です。2 行目を自分のキーに置き換えます。画像には `character.py` も写っていますが、この段階ではまだなくて構いません。
+このリポジトリで固定している Google Gen AI SDK 1.39.1 は、Google Cloud の接続先を選ぶ設定に `GOOGLE_GENAI_USE_VERTEXAI` を使います。サービスの説明は Gemini Enterprise Agent Platform に統一し、設定名は SDK が受け付ける値を使っています。SDK を更新する場合は、新しい公式手順の `GOOGLE_GENAI_USE_ENTERPRISE` への対応も合わせて確認してください。
 
-![ファイル一覧で .env を選び、GOOGLE_API_KEY を編集する画面例](docs/images/cloud-shell-env.png)
+`global` はグローバルエンドポイントです。処理する地域の指定が必要な場合は、講師とモデルが対応するロケーション・利用条件を確認してください。[Gemini 3.8 Flash の対応ロケーション](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/3-8-flash)
 
-このリポジトリでは、`.env` と `env/` は Git の管理対象から除外されています。API キーを `app.py` や `character.py` に書く必要はありません。
+以前の AI Studio 方式の `.env` を使っていた場合は、`GOOGLE_API_KEY` と `GEMINI_API_KEY` の行を削除してください。ターミナルでそれらを設定していた場合も、次を実行してからサーバーを起動します。
+
+```bash
+unset GOOGLE_API_KEY GEMINI_API_KEY
+```
+
+`.env` と `env/` は Git の管理対象から除外されています。認証は ADC を使うため、`app.py` や `character.py` に認証情報を書く必要はありません。
 
 > このハンズオンでは、`init.sh`、`set_env.sh`、`setupAPIkey.sh` は使いません。ここに書かれた手順と `.env` の設定だけで進めます。
 
@@ -201,7 +219,7 @@ Cloud Shell 全体の画面例です。右上にある、青いターミナル�
 
 ![黒猫のキャラクターと、音声選択欄・入力欄・送信ボタンがあるアプリの初期画面](docs/images/app-start.png)
 
-1. 入力欄の左にある音声の選択欄から、`Google 日本語 (ja-JP)` を選びます。表示名が少し違う場合は、日本語の Google 音声を選んでください。
+1. 入力欄の左にある音声の選択欄から、日本語（`ja-JP`）の音声を選びます。日本語の音声がある場合は、最初から選択されています。
 2. 入力欄に「こんにちは！」と入力します。
 3. 右側の送信ボタンを押します。Enter でも送信できます。改行は Shift+Enter です。
 
@@ -240,7 +258,7 @@ Cloud Shell には Gemini CLI が用意されています。初回にテーマ�
 
 日本語の依頼を入力できる画面になったら準備完了です。
 
-> Gemini CLI のログインと、これから作るアプリの API キー設定は別です。CLI にログインできていても、アプリには `.env` の設定が必要です。
+> Gemini CLI のログインと、アプリの Agent Platform 認証は別です。アプリには、手順 1 のプロジェクトの利用権限・ADC と `.env` の接続設定が必要です。
 
 ### 3-2. `character.py` を作ってもらう
 
@@ -265,7 +283,7 @@ LlmAgent のインスタンスを root_agent という変数に代入してく�
 
 今回はツールを追加せず、character.py だけを作成してください。
 既存のファイルや依存パッケージは変更しないでください。
-.env の内容や API キーを読み取ったり表示したりする必要はありません。
+.env や認証情報を読み取ったり表示したりする必要はありません。
 Web サーバーの起動は自分で行います。
 ```
 
@@ -297,7 +315,7 @@ root_agent = LlmAgent(
 
 Gemini CLI でうまく作れない場合は、エディターで `character.py` を新規作成し、このコード全体を貼り付けて保存しても進められます。
 
-> **資料からの更新点（2026 年 10 月 24 日確認）：** 元の資料は `gemini-2.5-flash` を使っています。現在、Gemini 2.5 系は過去の利用者にアクセスが制限されているため、本手順の例は `gemini-3.8-flash` にしています。開催時に講師からモデル名の指定があれば、この README 内の `model` の値をその名前に読み替えてください。[モデルの提供状況](https://ai.google.dev/gemini-api/docs/deprecations)・[Gemini 3.8 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash)
+> 本手順は Agent Platform の `gemini-3.8-flash` を使います。開催時に講師からモデル名の指定があれば、README 内の `model` をその名前に読み替えてください。[モデルの仕様・対応ロケーション](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/3-8-flash)
 
 ### 3-4. AI の返答を確認する
 
@@ -317,7 +335,7 @@ python -m flask --app app run --host=0.0.0.0 --port=8080
 
 **オウム返しではなく、質問に対する返答が表示されれば成功です。**
 
-API の応答には時間がかかります。`Thinking...` の表示中は、続けて送信せずに待ちます。
+API の応答には 1 分以上かかる場合もあります。`Thinking...` の表示中は、続けて送信せずに待ちます。エラーが表示された場合は、ターミナル 1 のログを確認してください。
 
 確認できたら、ターミナル 1 で `Ctrl+C` を押して停止します。
 
@@ -465,7 +483,7 @@ python -m flask --app app run --host=0.0.0.0 --port=8080
 
 返答に含まれるニュースの日付や内容を、ブラウザーでも検索して確かめます。
 
-**検索の設定がコードに入り、エラーなく会話を続けられることを確認してください。** 検索するかどうかはモデルが判断します。このサンプル画面には検索履歴や検索結果の専用表示がないため、返答だけで検索の実行を断定できません。[Google 検索連携の動作](https://ai.google.dev/gemini-api/docs/google-search)
+**検索の設定がコードに入り、エラーなく会話を続けられることを確認してください。** 検索するかどうかはモデルが判断します。このサンプル画面には検索履歴や検索結果の専用表示がないため、返答だけで検索の実行を断定できません。[Google 検索連携の動作](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/grounding/grounding-with-google-search)
 
 確認できたら、ターミナル 1 で `Ctrl+C` を押して停止します。
 
@@ -611,7 +629,7 @@ python -m flask --app app run --host=0.0.0.0 --port=8080
 3. ターミナル 2 の Gemini CLI に `/quit` と入力して終了します。
 4. 必要であれば、エディターのファイル一覧から、作成した `character.py` や画像、変更したファイルをダウンロードして手元に保存します。
 
-`.env` には自分の API キーが入っています。成果物として共有するファイルには含めないでください。
+`.env` には利用するプロジェクトの設定が入っています。共有時はプロジェクト ID をひな形に戻し、認証情報のファイルを成果物に含めないでください。
 
 ### 後日、続きから再開するとき
 
@@ -648,7 +666,7 @@ gemini
 
 ## うまく動かないとき
 
-アプリ画面に `Sorry, something went wrong. Please try again.` と表示された場合は、**まずターミナル 1 のエラーメッセージを確認します。** 講師に相談するときは、止まった手順の番号とエラーを伝えてください。API キーが含まれる部分は見せないようにします。
+アプリ画面に `Sorry, something went wrong. Please try again.` と表示された場合は、**まずターミナル 1 のエラーメッセージを確認します。** 講師に相談するときは、止まった手順の番号とエラーを伝えてください。認証情報やアクセストークンは見せないようにします。
 
 | 症状                                                          | 確認すること・対処                                                                                                                                                                                                |
 | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -661,9 +679,9 @@ gemini
 | `Address already in use`                                      | 同じポートでサーバーがすでに動いています。前に起動したターミナルに戻り、`Ctrl+C` で停止してから起動し直します。                                                                                                   |
 | `character.py` を作ったのにオウム返しのまま                   | ファイルが `app.py` と同じフォルダーにあるか、名前が正確に `character.py` かを確認し、保存後にサーバーを再起動します。                                                                                            |
 | `SyntaxError` / `IndentationError`                            | `character.py` の引用符、括弧、カンマ、行頭の空白を確認します。手順の完成例と比較するか、エラーを Gemini CLI に伝えて修正を依頼します。                                                                           |
-| API キーの不足・無効、`400` / `401` / `403`                   | `.env` のキーをひな形から置き換えたか、保存したか、`GOOGLE_GENAI_USE_VERTEXAI=False` か確認します。キー自体を表示せずに設定を見直し、サーバーを再起動します。権限や地域の制限が表示された場合は講師に相談します。 |
-| `404` / モデルが見つからない                                  | `character.py` の `model` のつづりを確認します。利用可能なモデルはアカウントや時期で変わるため、講師と [モデルの提供状況](https://ai.google.dev/gemini-api/docs/deprecations) を確認します。                      |
-| `429` / `RESOURCE_EXHAUSTED`                                  | 呼び出し回数などの上限に達している可能性があります。連続送信を止め、AI Studio で利用枠を確認します。時間を空けても直らない場合は、モデル・プロジェクトの利用条件を講師と確認します。                              |
+| 認証エラー・`401` / `403` | 手順 1 のプロジェクト・API 有効化・Agent Platform の利用権限を確認します。`.env` の 3 行と ADC を確認し、サーバーを再起動します。Cloud Shell で承認を求められたら承認してください。 |
+| `404` / モデルが見つからない | `character.py` のモデル名、`.env` のプロジェクト ID と `global` を確認します。講師と [モデルの仕様](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/3-8-flash)・プロジェクトのアクセス条件を確認します。 |
+| `429` / `RESOURCE_EXHAUSTED` | 呼び出し上限や共有容量の不足の可能性があります。連続送信を止め、時間を空けて再試行します。講師と Google Cloud のクォータ・利用条件を確認します。 |
 | 性格の変更が反映されない                                      | `character.py` の保存後にサーバーを再起動し、プレビューを再読み込みします。                                                                                                                                       |
 | 画像が表示されない / 話すと元の画像に戻る                     | `static/images/` の実際の名前と、HTML の 1 か所・JavaScript の 2 か所を比較します。大文字・小文字、`close` と `closed`、拡張子にも注意します。                                                                    |
 
@@ -671,26 +689,14 @@ gemini
 
 ### 音声が出ない・音声の選択欄が空になる
 
-このサンプルは、ブラウザーが提供する音声のうち、**名前に `Google` を含む音声だけ**を選択欄に表示します。環境によっては利用できる音声がなく、送信後の処理でエラーになることもあります。
+このサンプルは、ブラウザーが提供する音声を表示し、日本語（`ja-JP`）の音声を優先します。音声がない場合は選択欄が無効になり、テキストで会話を続けられます。音声が使えないときは口のアニメーションも開始しません。
 
 1. Google Chrome で開いているか確認します。
 2. プレビューを再読み込みし、音声一覧が読み込まれるまで少し待ちます。
-3. 日本語の音声を選び直します。
+3. 日本語の音声があれば選び直します。
 4. パソコンとタブのミュート、イヤホンの出力先を確認します。
 
-それでも音声一覧が空の場合は、講師に相談するか、ターミナル 2 の Gemini CLI に次の修正を依頼してください。
-
-```text
-static/app.js の音声選択を改善してください。
-現在は名前に Google を含む音声だけを表示していますが、利用可能な音声をすべて表示し、
-ja-JP の音声があれば優先して選択するようにしてください。
-音声が1件もない場合や選択肢がない場合にも例外を出さず、
-テキストの返答を読めるようにしてください。
-音声を使えない場合は口のアニメーションを開始しないでください。
-その他の機能は変更しないでください。
-```
-
-変更後は保存し、プレビューを再読み込みします。日本語の音声が環境に存在しない場合でも、テキストで会話を確認しながら先に進めます。
+音声が利用できなくても、返答のテキストを確認しながら次に進めます。
 
 ## ファイルの役割
 
@@ -698,7 +704,7 @@ ja-JP の音声があれば優先して選択するようにしてください�
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `app.py`               | ブラウザーからのメッセージを受け取る Web サーバー。`character.py` がなければオウム返しし、あればエージェントを呼び出します。 |
 | `character.py`         | ハンズオンで作成するファイル。モデル、名前、性格、利用するツールを設定します。                                               |
-| `.env`                 | 自分の API キーを保存するファイル。公開しません。                                                                            |
+| `.env` | Agent Platform のプロジェクト ID と接続設定を保存するファイル。認証情報は ADC で管理します。 |
 | `.env.template`        | `.env` を作るためのひな形です。                                                                                              |
 | `requirements.txt`     | インストールする Python パッケージとバージョンの一覧です。                                                                   |
 | `templates/index.html` | アプリの画面と、最初に表示する画像を定義します。                                                                             |

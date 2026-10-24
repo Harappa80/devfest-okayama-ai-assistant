@@ -10,13 +10,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let voices = [];
     let lipSyncInterval;
+    let typewriterTimeout;
+    const speechAvailable = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
 
     function populateVoiceList() {
-        const allVoices = speechSynthesis.getVoices();
-        voices = allVoices.filter(voice => voice.name.includes('Google'));
+        voices = speechAvailable ? speechSynthesis.getVoices() : [];
         voiceSelect.innerHTML = '';
+        voiceSelect.disabled = voices.length === 0;
 
-        let usVoiceIndex = -1;
+        let japaneseVoiceIndex = -1;
 
         voices.forEach((voice, i) => {
             const option = document.createElement('option');
@@ -25,49 +27,50 @@ document.addEventListener('DOMContentLoaded', () => {
             option.setAttribute('data-name', voice.name);
             voiceSelect.appendChild(option);
 
-            if (voice.lang === 'en-US') {
-                if (usVoiceIndex === -1) { // Find the first US voice
-                    usVoiceIndex = i;
+            if (voice.lang === 'ja-JP') {
+                if (japaneseVoiceIndex === -1) {
+                    japaneseVoiceIndex = i;
                 }
             }
         });
 
-        if (usVoiceIndex !== -1) {
-            voiceSelect.selectedIndex = usVoiceIndex;
+        if (japaneseVoiceIndex !== -1) {
+            voiceSelect.selectedIndex = japaneseVoiceIndex;
         }
     }
 
     populateVoiceList();
-    if (speechSynthesis.onvoiceschanged !== undefined) {
+    if (speechAvailable && speechSynthesis.onvoiceschanged !== undefined) {
         speechSynthesis.onvoiceschanged = populateVoiceList;
     }
 
     const typewriter = (text, element, speed = 50) => {
+        clearTimeout(typewriterTimeout);
         // Use Intl.Segmenter to handle grapheme clusters correctly
         if (window.Intl && Intl.Segmenter) {
             const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
             const segments = Array.from(segmenter.segment(text)).map(s => s.segment);
             
             let i = 0;
-            element.innerHTML = "";
+            element.textContent = "";
 
             function type() {
                 if (i < segments.length) {
-                    element.innerHTML += segments[i];
+                    element.textContent += segments[i];
                     i++;
-                    setTimeout(type, speed);
+                    typewriterTimeout = setTimeout(type, speed);
                 }
             }
             type();
         } else {
             // Fallback for older browsers
             let i = 0;
-            element.innerHTML = "";
+            element.textContent = "";
             function type() {
                 if (i < text.length) {
-                    element.innerHTML += text.charAt(i);
+                    element.textContent += text.charAt(i);
                     i++;
-                    setTimeout(type, speed);
+                    typewriterTimeout = setTimeout(type, speed);
                 }
             }
             type();
@@ -75,13 +78,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const speak = (text) => {
+        clearInterval(lipSyncInterval);
+        characterImage.src = closedMouthImg;
+        if (!speechAvailable) return;
         if (speechSynthesis.speaking) {
             speechSynthesis.cancel();
         }
-        clearInterval(lipSyncInterval);
+        if (voices.length === 0) return;
 
         const utterance = new SpeechSynthesisUtterance(text);
-        const selectedOption = voiceSelect.selectedOptions[0].getAttribute('data-name');
+        const selectedOption = voiceSelect.selectedOptions[0]?.getAttribute('data-name');
         const selectedVoice = voices.find(voice => voice.name === selectedOption);
         if (selectedVoice) {
             utterance.voice = selectedVoice;
@@ -107,7 +113,6 @@ document.addEventListener('DOMContentLoaded', () => {
         utterance.onerror = stopLipSync;
 
         speechSynthesis.speak(utterance);
-        startLipSync();
     };
 
     const handleSendMessage = async () => {
