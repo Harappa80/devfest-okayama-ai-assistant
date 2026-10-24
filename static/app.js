@@ -1,158 +1,138 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const textInput = document.getElementById('text-input');
     const sendButton = document.getElementById('send-button');
     const characterImage = document.getElementById('character-image');
     const voiceSelect = document.getElementById('voice-select');
     const status = document.getElementById('status');
-
+    const audio = document.getElementById('speech-audio');
+    const audioStatus = document.getElementById('audio-status');
+    const sources = document.getElementById('sources');
+    const searchSuggestions = document.getElementById('search-suggestions');
     const openMouthImg = '/static/images/char-mouth-open.png';
     const closedMouthImg = '/static/images/char-mouth-closed.png';
-
-    let voices = [];
+    const history = [];
+    let busy = false;
     let lipSyncInterval;
+    let audioUrl;
 
-    function populateVoiceList() {
-        const allVoices = speechSynthesis.getVoices();
-        voices = allVoices.filter(voice => voice.name.includes('Google'));
-        voiceSelect.innerHTML = '';
-
-        let usVoiceIndex = -1;
-
-        voices.forEach((voice, i) => {
-            const option = document.createElement('option');
-            option.textContent = `${voice.name} (${voice.lang})`;
-            option.setAttribute('data-lang', voice.lang);
-            option.setAttribute('data-name', voice.name);
-            voiceSelect.appendChild(option);
-
-            if (voice.lang === 'en-US') {
-                if (usVoiceIndex === -1) { // Find the first US voice
-                    usVoiceIndex = i;
-                }
-            }
-        });
-
-        if (usVoiceIndex !== -1) {
-            voiceSelect.selectedIndex = usVoiceIndex;
-        }
-    }
-
-    populateVoiceList();
-    if (speechSynthesis.onvoiceschanged !== undefined) {
-        speechSynthesis.onvoiceschanged = populateVoiceList;
-    }
-
-    const typewriter = (text, element, speed = 50) => {
-        // Use Intl.Segmenter to handle grapheme clusters correctly
-        if (window.Intl && Intl.Segmenter) {
-            const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
-            const segments = Array.from(segmenter.segment(text)).map(s => s.segment);
-            
-            let i = 0;
-            element.innerHTML = "";
-
-            function type() {
-                if (i < segments.length) {
-                    element.innerHTML += segments[i];
-                    i++;
-                    setTimeout(type, speed);
-                }
-            }
-            type();
-        } else {
-            // Fallback for older browsers
-            let i = 0;
-            element.innerHTML = "";
-            function type() {
-                if (i < text.length) {
-                    element.innerHTML += text.charAt(i);
-                    i++;
-                    setTimeout(type, speed);
-                }
-            }
-            type();
-        }
-    };
-
-    const speak = (text) => {
-        if (speechSynthesis.speaking) {
-            speechSynthesis.cancel();
-        }
+    const stopLipSync = () => {
         clearInterval(lipSyncInterval);
+        characterImage.src = closedMouthImg;
+    };
+    audio.addEventListener('playing', () => {
+        stopLipSync();
+        let mouthOpen = false;
+        lipSyncInterval = setInterval(() => {
+            mouthOpen = !mouthOpen;
+            characterImage.src = mouthOpen ? openMouthImg : closedMouthImg;
+        }, 150);
+    });
+    ['pause', 'ended', 'error', 'waiting'].forEach(event => audio.addEventListener(event, stopLipSync));
 
-        const utterance = new SpeechSynthesisUtterance(text);
-        const selectedOption = voiceSelect.selectedOptions[0].getAttribute('data-name');
-        const selectedVoice = voices.find(voice => voice.name === selectedOption);
-        if (selectedVoice) {
-            utterance.voice = selectedVoice;
+    try {
+        const response = await fetch('/config');
+        if (!response.ok) throw new Error('Voice configuration failed');
+        const config = await response.json();
+        voiceSelect.replaceChildren(...config.voices.map(voice => new Option(voice, voice)));
+        voiceSelect.value = config.default_voice;
+    } catch (error) {
+        audioStatus.textContent = '音声設定を取得できませんでした。ページを再読み込みしてください。';
+    }
+
+    const post = async (path, body) => {
+        const response = await fetch(path, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(typeof error.detail === 'string' ? error.detail : 'リクエストに失敗しました。');
         }
-
-        const startLipSync = () => {
-            clearInterval(lipSyncInterval);
-            let mouthOpen = true;
-            characterImage.src = openMouthImg;
-            lipSyncInterval = setInterval(() => {
-                characterImage.src = mouthOpen ? openMouthImg : closedMouthImg;
-                mouthOpen = !mouthOpen;
-            }, 150);
-        };
-
-        const stopLipSync = () => {
-            clearInterval(lipSyncInterval);
-            characterImage.src = closedMouthImg;
-        };
-
-        utterance.onstart = startLipSync;
-        utterance.onend = stopLipSync;
-        utterance.onerror = stopLipSync;
-
-        speechSynthesis.speak(utterance);
-        startLipSync();
+        return response;
     };
 
     const handleSendMessage = async () => {
         const message = textInput.value.trim();
-        if (!message) return;
-
-        textInput.value = '';
-        textInput.style.height = '50px';
-        status.textContent = "Thinking...";
-
+        if (!message || busy) return;
+        busy = true;
+        sendButton.disabled = true;
+        textInput.disabled = true;
+        voiceSelect.disabled = true;
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.hidden = true;
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
+        audioStatus.textContent = '';
+        status.textContent = 'Thinking...';
+        if (sources) sources.replaceChildren();
+        if (searchSuggestions) { searchSuggestions.hidden = true; searchSuggestions.srcdoc = ''; }
+        let replyReceived = false;
         try {
-            const response = await fetch('/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ message: message }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-
+            const response = await post('/chat', { message, history });
             const data = await response.json();
-            typewriter(data.response, status);
-            speak(data.response);
+            // Render model text literally, including any HTML-like content.
+            status.textContent = data.response;
+            if (sources) {
+                for (const source of data.sources || []) {
+                    const url = new URL(source.url);
+                    if (!['https:', 'http:'].includes(url.protocol)) continue;
+                    const link = document.createElement('a');
+                    link.href = url.href;
+                    link.textContent = source.title;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    sources.append(link);
+                }
+            }
+            if (searchSuggestions && data.grounding_html) {
+                searchSuggestions.srcdoc = data.grounding_html;
+                searchSuggestions.hidden = false;
+            }
+            replyReceived = true;
+            history.push({ role: 'user', text: message }, { role: 'model', text: data.response });
+            history.splice(0, Math.max(0, history.length - 20));
+            textInput.value = '';
+            textInput.style.height = '50px';
+            audioStatus.textContent = '音声を生成しています…';
+            const speech = await post('/tts', { text: data.response, voice: voiceSelect.value || 'Kore' });
+            audioUrl = URL.createObjectURL(await speech.blob());
+            audio.src = audioUrl;
+            audio.hidden = false;
+            audioStatus.textContent = '';
+            try {
+                await audio.play();
+            } catch {
+                audioStatus.textContent = '再生ボタンを押して音声を再生してください。';
+            }
         } catch (error) {
-            console.error('Error:', error);
-            const errorMessage = 'Sorry, something went wrong. Please try again.';
-            typewriter(errorMessage, status);
-            speak(errorMessage);
+            stopLipSync();
+            if (replyReceived) {
+                audioStatus.textContent = `音声を生成できませんでした: ${error.message}`;
+            } else {
+                status.textContent = error.message;
+            }
+        } finally {
+            busy = false;
+            sendButton.disabled = false;
+            textInput.disabled = false;
+            voiceSelect.disabled = false;
         }
     };
 
     sendButton.addEventListener('click', handleSendMessage);
-
-    textInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
-            e.preventDefault();
+    textInput.addEventListener('keydown', event => {
+        if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
+            event.preventDefault();
             handleSendMessage();
         }
     });
-
     textInput.addEventListener('input', () => {
         textInput.style.height = 'auto';
         textInput.style.height = `${textInput.scrollHeight}px`;
+    });
+    window.addEventListener('beforeunload', () => {
+        audio.pause();
+        stopLipSync();
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
     });
 });

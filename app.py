@@ -1,58 +1,198 @@
-from flask import Flask, render_template, request, jsonify
-from google.adk.runners import InMemoryRunner
-from google.genai import types
-import asyncio
+"""FastAPI companion: Gemini text responses and Gemini TTS audio."""
+from contextlib import asynccontextmanager
+import logging
 import os
+from pathlib import Path
+from typing import Annotated, Literal
 
-app = Flask(__name__)
-app.json.ensure_ascii = False
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+import google.auth
+from google.auth.exceptions import GoogleAuthError
+from google import genai
+from google.genai import errors, types
+from pydantic import BaseModel, Field, StringConstraints
+
+from companion_agent import load_runner, run_turn
+
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
+logger = logging.getLogger(__name__)
+CHAT_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+TTS_MODEL = os.getenv("GEMINI_TTS_MODEL", "gemini-3.8-flash-tts")
+SYSTEM_INSTRUCTION = os.getenv(
+    "SYSTEM_INSTRUCTION",
+    "You are WakuWaku, a friendly AI companion. Reply in the user's language. "
+    "Keep answers concise and natural for spoken conversation.",
+)
+VOICES = ("Kore", "Puck", "Charon", "Fenrir", "Aoede")
+DEFAULT_VOICE = os.getenv("GEMINI_TTS_VOICE", "Kore")
+if DEFAULT_VOICE not in VOICES:
+    raise ValueError(f"GEMINI_TTS_VOICE must be one of: {', '.join(VOICES)}")
+Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=8000)]
 
 
-runner = None
-character_exists = os.path.exists('character.py')
+class Turn(BaseModel):
+    role: Literal["user", "model"]
+    text: Text
 
-if character_exists:
-    import character
-    runner = InMemoryRunner(
-        agent=character.root_agent,
-        app_name="Demo App",
+
+class ChatRequest(BaseModel):
+    message: Text
+    history: list[Turn] = Field(default_factory=list, max_length=20)
+
+
+class Source(BaseModel):
+    title: str
+    url: str
+
+
+class ChatResponse(BaseModel):
+    response: str
+    sources: list[Source] = Field(default_factory=list)
+    grounding_html: str | None = None
+
+
+class SpeechRequest(BaseModel):
+    text: Text
+    voice: Literal["Kore", "Puck", "Charon", "Fenrir", "Aoede"] = DEFAULT_VOICE
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Defer authentication until startup, so importing the app needs no credentials.
+    app.state.genai = None
+    app.state.runner = None
+    try:
+        project = os.getenv("GOOGLE_CLOUD_PROJECT")
+        if not project or project == "your-project-id":
+            raise ValueError("Set GOOGLE_CLOUD_PROJECT in .env")
+        credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+        app.state.genai = genai.Client(
+            vertexai=True, project=project,
+            location=os.getenv("GOOGLE_CLOUD_LOCATION", "global"), credentials=credentials,
+            http_options=types.HttpOptions(
+                timeout=120000,
+                retry_options=types.HttpRetryOptions(
+                    attempts=2, initial_delay=1, max_delay=2,
+                    http_status_codes=[429, 500, 502, 503, 504],
+                ),
+            ),
+        )
+    except (ValueError, OSError, GoogleAuthError):
+        logger.warning("Gemini authentication is not configured. See README.md.")
+    if app.state.genai is not None:
+        app.state.runner = load_runner(BASE_DIR, app.state.genai, CHAT_MODEL)
+    try:
+        yield
+    finally:
+        if app.state.runner is not None:
+            await app.state.runner.close()
+        if app.state.genai is not None:
+            await app.state.genai.aio.aclose()
+            app.state.genai.close()
+
+
+app = FastAPI(title="WakuWaku", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+
+
+def get_client(request: Request) -> genai.Client:
+    client = request.app.state.genai
+    if client is None:
+        raise HTTPException(503, "Gemini authentication is not configured. See README.md.")
+    return client
+
+
+async def generate(client: genai.Client, **kwargs):
+    try:
+        return await client.aio.models.generate_content(**kwargs)
+    except errors.APIError as exc:
+        logger.warning("Gemini request failed (code=%s)", exc.code)
+        if exc.code == 429:
+            raise HTTPException(429, "Gemini quota exceeded. Please try again later.") from exc
+        raise HTTPException(502, "Gemini request failed. Check model access and server configuration.") from exc
+    except Exception as exc:
+        # Never return SDK errors containing credentials or request details to the browser.
+        logger.warning("Gemini connection failed (%s)", type(exc).__name__)
+        raise HTTPException(502, "Could not connect to Gemini. Please try again later.") from exc
+
+
+@app.get("/", include_in_schema=False)
+async def index():
+    return FileResponse(BASE_DIR / "templates" / "index.html")
+
+
+@app.get("/config")
+async def config():
+    return {"voices": VOICES, "default_voice": DEFAULT_VOICE}
+
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(body: ChatRequest, request: Request, client: genai.Client = Depends(get_client)):
+    if request.app.state.runner is not None:
+        try:
+            text, grounding = await run_turn(request.app.state.runner, body)
+        except errors.APIError as exc:
+            logger.warning("ADK model request failed (code=%s)", exc.code)
+            raise HTTPException(429 if exc.code == 429 else 502, "Agent request failed. Check quota and model access.") from exc
+        except Exception as exc:
+            logger.warning("ADK request failed (%s)", type(exc).__name__)
+            raise HTTPException(502, "Agent request failed. Check model access and server configuration.") from exc
+        if not text.strip():
+            raise HTTPException(502, "The agent returned no text. Please rephrase your message.")
+        return chat_result(text, grounding)
+    if os.getenv("COMPANION_MODE", "gemini") == "echo":
+        return ChatResponse(response=body.message)
+    contents = [types.Content(role=turn.role, parts=[types.Part(text=turn.text)]) for turn in body.history]
+    contents.append(types.Content(role="user", parts=[types.Part(text=body.message)]))
+    result = await generate(
+        client, model=CHAT_MODEL, contents=contents,
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_INSTRUCTION, max_output_tokens=2048,
+            thinking_config=types.ThinkingConfig(thinking_level="LOW"),
+        ),
     )
-
-adk_session = None
-session_lock = asyncio.Lock()
-
-@app.route('/')
-def index():
-    return render_template('index.html')
+    text = result.text
+    if not text or not text.strip():
+        raise HTTPException(502, "Gemini returned no text. Please rephrase your message.")
+    grounding = result.candidates[0].grounding_metadata if getattr(result, "candidates", None) else None
+    return chat_result(text, grounding)
 
 
-@app.route('/chat', methods=['POST'])
-async def chat():
-    user_message = request.json.get('message')
-
-    if not character_exists:
-        return jsonify({'response': user_message})
-
-    global adk_session
-    if adk_session is None:
-        async with session_lock:
-            if adk_session is None:
-                adk_session = await runner.session_service.create_session(
-                    app_name=runner.app_name, user_id="inapp_user"
-                )
-
-    content = types.Content(parts=[types.Part(text=user_message)])
-    response_text = ""
-    async for event in runner.run_async(
-        user_id=adk_session.user_id,
-        session_id=adk_session.id,
-        new_message=content,
-    ):
-        if event.content and event.content.parts and event.content.parts[0].text:
-            response_text += event.content.parts[0].text
-
-    return jsonify({'response': response_text})
+def chat_result(text, grounding):
+    sources = []
+    html = None
+    if grounding:
+        for chunk in grounding.grounding_chunks or []:
+            if chunk.web and chunk.web.uri and chunk.web.uri.startswith(("https://", "http://")):
+                sources.append(Source(title=chunk.web.title or chunk.web.uri, url=chunk.web.uri))
+        if grounding.search_entry_point:
+            html = grounding.search_entry_point.rendered_content
+    return ChatResponse(response=text, sources=sources, grounding_html=html)
 
 
-if __name__ == '__main__':
-    app.run(debug=True)
+@app.post("/tts")
+async def speech(body: SpeechRequest, client: genai.Client = Depends(get_client)):
+    result = await generate(
+        client, model=TTS_MODEL,
+        contents=[types.Content(role="user", parts=[types.Part(text=body.text)])],
+        config=types.GenerateContentConfig(
+            response_modalities=["AUDIO"],
+            speech_config=types.SpeechConfig(voice_config=types.VoiceConfig(voice=body.voice)),
+        ),
+    )
+    # Gemini 3.8 unary TTS returns a complete WAV container. Do not wrap it again.
+    for candidate in result.candidates or []:
+        for part in candidate.content.parts if candidate.content else []:
+            audio = part.inline_data
+            if audio and audio.data and audio.data.startswith(b"RIFF") and audio.data[8:12] == b"WAVE":
+                return Response(content=audio.data, media_type="audio/wav", headers={"Cache-Control": "no-store"})
+    raise HTTPException(502, "Gemini returned no WAV audio. Please try again.")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app:app", host="127.0.0.1", port=int(os.getenv("PORT", "8000")))

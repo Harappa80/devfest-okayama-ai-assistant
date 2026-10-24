@@ -19,3 +19,5 @@
 | [avatar-generate-open.png](avatar-generate-open.png)         | 口を開いた画像の生成例                   | [54 枚目](https://docs.google.com/presentation/d/1nKmorvq0PVMgfLKNIPDbciXQHFEJGNkVYjW7FbSMtQQ/edit#slide=id.g3e402eef523_0_353) |
 | [cloud-shell-avatar-files.png](cloud-shell-avatar-files.png) | 画像の配置先                             | [56 枚目](https://docs.google.com/presentation/d/1nKmorvq0PVMgfLKNIPDbciXQHFEJGNkVYjW7FbSMtQQ/edit#slide=id.g3e402eef523_0_368) |
 | [app-custom-avatar.png](app-custom-avatar.png)               | アバター変更後の画面例                   | [58 枚目](https://docs.google.com/presentation/d/1nKmorvq0PVMgfLKNIPDbciXQHFEJGNkVYjW7FbSMtQQ/edit#slide=id.g3e402eef523_0_383) |
+
+Vertex AI／Antigravity CLIへの移行後、APIキー設定や旧CLIの画面は歴史的な参考画像として保持しています。現在の認証設定はREADME本文を使用してください。

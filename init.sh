@@ -8,10 +8,10 @@ handle_error() {
 }
 
 # --- Part 1: Set Google Cloud Project ID ---
-PROJECT_FILE="$HOME/project_id.txt"
+PROJECT_FILE="${COMPANION_PROJECT_FILE:-$HOME/project_id.txt}"
 echo "--- Setting Google Cloud Project ID File ---"
 
-read -p "Please enter your Google Cloud project ID: " user_project_id
+read -r -p "Please enter your Google Cloud project ID: " user_project_id
 
 if [[ -z "$user_project_id" ]]; then
   handle_error "No project ID was entered."
