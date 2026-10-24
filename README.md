@@ -1,14 +1,14 @@
 # DevFest Okayama：自分だけの AI アシスタントを作ろう
 
-キャラクターと会話できる Web アプリを、Gemini CLI に手伝ってもらいながら作るハンズオンです。ブラウザーで操作できる **Cloud Shell** を使います。手元のパソコンへの Python のインストールは不要です。
+キャラクターと会話できる Web アプリを、Antigravity CLI に手伝ってもらいながら作るハンズオンです。ブラウザーで操作できる **Cloud Shell** を使います。手元のパソコンへの Python のインストールは不要です。
 
 最初は、入力した言葉をそのまま返すサンプルから始めます。順番に進めると、好きな性格・口調で返答し、Google 検索を使い、自分で作ったアバターが話すアプリになります。
 
 ## 進め方
 
-1. [準備する](#step-1)：API キーを取得し、Cloud Shell を開く
+1. [準備する](#step-1)：Vertex AIとADCを設定し、Cloud Shellを開く
 2. [サンプルを動かす](#step-2)：コードを取得し、ブラウザーで表示する
-3. [AI と会話できるようにする](#step-3)：Gemini CLI で `character.py` を作る
+3. [AI と会話できるようにする](#step-3)：Antigravity CLI で `character.py` を作る
 4. [性格と口調を変える](#step-4)：自分だけのキャラクターにする
 5. [Google 検索を追加する](#step-5)：最近の情報を調べられるようにする
 6. [アバターを変える](#step-6)：口を開いた画像と閉じた画像を用意する
@@ -23,9 +23,9 @@
 - Google アカウント。資料と同じく、個人のアカウントで進めることをおすすめします
 - 音声を確認できるイヤホンまたはスピーカー
 
-Google AI Studio、Cloud Shell、Gemini アプリに同じアカウントでログインしておくと進めやすくなります。学校・会社のアカウントでは、管理者の設定によって利用できない場合があります。
+Cloud ShellにGoogle Cloudの利用権限を持つアカウントでログインします。画像生成でGeminiアプリを使う場合は、利用可能なアカウントで開いてください。
 
-Gemini API や Google 検索には利用枠・料金が設定されています。無料で使える範囲はモデルやアカウントによって異なるため、[Google AI Studio](https://aistudio.google.com/) の利用状況と [Gemini API の料金](https://ai.google.dev/gemini-api/docs/pricing) を確認してください。
+会話・音声・Google検索はVertex AIから利用します。課金が有効なプロジェクトを用意し、[Vertex AIの料金](https://cloud.google.com/vertex-ai/generative-ai/pricing)を確認してください。会話は `gemini-3.8-flash`、音声は `gemini-3.8-flash-tts` です。
 
 ### コマンドと指示文の違い
 
@@ -34,39 +34,40 @@ Gemini API や Google 検索には利用枠・料金が設定されています�
 | 操作する場所             | 入力するもの                                       |
 | ------------------------ | -------------------------------------------------- |
 | Cloud Shell のターミナル | `cd` や `python` で始まるコマンド                  |
-| Gemini CLI の入力欄      | 「ファイルを作成してください」など、日本語の指示文 |
+| Antigravity CLI の入力欄      | 「ファイルを作成してください」など、日本語の指示文 |
 | Cloud Shell エディター   | Python のコードや `.env` の設定                    |
 | アプリのプレビュー画面   | キャラクターに話しかける文章                       |
 
 ターミナルのコマンドは、コード枠の中身を **1 行ずつ貼り付けて Enter** で実行してください。コマンドの前に `$` を付ける必要はありません。
 
-画面例は元のハンズオン資料から抜粋しています。画像内に旧フォルダー名 `bwai-nara-companion-python` や以前のモデル名・ポート番号が写っている場合があります。**入力する値やコマンドは、この README の本文に従ってください。** ボタンやファイルの位置を探すときに画像を使います。
+画面例は元のハンズオン資料から抜粋しています。画像内に旧CLIの画面、旧フォルダー名 `bwai-nara-companion-python` や以前のモデル名・ポート番号が写っている場合があります。**入力する値やコマンドは、この README の本文に従ってください。** ボタンやファイルの位置を探すときに画像を使います。
 
 <a id="step-1"></a>
 
 ## 1. 準備する
 
-### 1-1. Gemini API キーを取得する
+### 1-1. Vertex AIとADCを準備する
 
-1. Chrome で [Google AI Studio の API キー画面](https://aistudio.google.com/api-keys) を開きます。
-2. Google アカウントでログインし、初回の利用確認が表示されたら内容を確認します。
-3. 「API キーを作成（Create API key）」を選びます。初回利用時にキーが自動作成されている場合は、そのキーも利用できます。
-4. 名前やプロジェクトを求められたら、ハンズオン用の名前を入力し、利用できるプロジェクトを選んで作成します。
-5. 作成したキーをコピーします。あとで `.env` ファイルに設定します。
+[Google Cloud Console](https://console.cloud.google.com/)で課金が有効なプロジェクトを選択し、次の1-2でCloud Shellを開いてから実行します。
 
-API キー画面の右上にある「API キーを作成」を選びます。
+```bash
+export GOOGLE_CLOUD_PROJECT='自分のプロジェクトID'
+gcloud config set project "$GOOGLE_CLOUD_PROJECT"
+gcloud services enable aiplatform.googleapis.com --project "$GOOGLE_CLOUD_PROJECT"
+export GOOGLE_CLOUD_LOCATION=global
+export AGY_ADC_AUTH=true
+```
 
-![Google AI Studio の API キー一覧。右上に「API キーを作成」ボタンがあります。](docs/images/ai-studio-api-keys.png)
+Cloud Shellではログイン済みユーザーのADCを使います。承認画面が出たら承認してください。APIキーは使用しません。実行者には利用するプロジェクトの `roles/aiplatform.user` と、クォータプロジェクトの `roles/serviceusage.serviceUsageConsumer` が必要です。API有効化には `serviceusage.services.enable` 権限が必要です。既に有効な場合は有効化を省略できます。
 
-作成画面では、キーの名前とプロジェクトを指定します。画像のプロジェクト名は一例です。
+既存のSA／Workload Identityを接続した環境では、そのADCを使います。SAキーは発行しません。ローカル開発でSAを偽装する場合のみ、実行者に対象SAの `roles/iam.serviceAccountTokenCreator` を付け、次を実行します。
 
-<img src="docs/images/ai-studio-create-key.png" alt="キーの名前とプロジェクトを指定し、右下の「キーを作成」を押す画面例" width="680" />
+```bash
+# Cloud Shellの通常手順では不要。SAを偽装する場合のみ。
+gcloud auth application-default login --impersonate-service-account=YOUR_SA@YOUR_PROJECT.iam.gserviceaccount.com
+```
 
-プロジェクトが候補に表示されない場合は、AI Studio の「Projects」から利用するプロジェクトをインポートして、API キー画面に戻ります。画面の表示や必要な操作は、アカウントによって異なります。[公式の API キー取得手順](https://ai.google.dev/gemini-api/docs/api-key) も参照してください。
-
-> API キーはパスワードのように扱います。Gemini CLI への指示文、チャット、公開リポジトリ、スクリーンショットには載せず、後述の `.env` に自分で入力してください。
-
-**確認：API キーをコピーできたら、次に進みます。**
+[Cloud ShellのADC](https://docs.cloud.google.com/docs/authentication/set-up-adc-local-dev-environment)も参照してください。
 
 ### 1-2. Cloud Shell を開く
 
@@ -95,6 +96,8 @@ python3 --version
 
 ### 2-1. コードを取得する
 
+このリポジトリがprivateの場合、参加者にはGitHub上のアクセス権が必要です。GitHubへの認証はCloud ShellのGoogle認証とは別です。未設定の場合は `gh auth login --hostname github.com --git-protocol https --web` → `gh auth setup-git` を実行してからcloneします。アクセス権がない場合は講師に配布用ブランチ／アーカイブを確認してください。
+
 **操作場所：** Cloud Shell のターミナル。
 
 次のコマンドを順番に実行します。
@@ -120,50 +123,39 @@ ls
 同じターミナルで、次のコマンドを 1 行ずつ実行します。
 
 ```bash
-python3 -m venv env
-source env/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-- 1 行目：このアプリ専用の Python 環境を `env` フォルダーに作ります。
-- 2 行目：その環境を有効にします。入力行の先頭に `(env)` が表示されます。
+- 1 行目：このアプリ専用の Python 環境を `.venv` フォルダーに作ります。
+- 2 行目：その環境を有効にします。入力行の先頭に `(.venv)` が表示されます。
 - 3 行目：アプリに必要なパッケージをインストールします。完了まで数分かかる場合があります。
 
 インストール中は文字が流れます。再びコマンドを入力できる状態に戻るまで待ちます。`ERROR` が表示された場合は、次へ進む前に [対処方法](#troubleshooting) を確認してください。
 
-### 2-3. API キーを設定する
+### 2-3. Vertex AIの設定ファイルを作る
 
-同じターミナルで、設定ファイルのひな形をコピーします。**このコマンドは初回だけ実行します。再実行すると、入力済みの API キーがひな形で上書きされます。**
+初回だけ実行します。再実行すると設定を上書きするため、再開時はコピー不要です。
 
 ```bash
 cp .env.template .env
+chmod 600 .env
+python - <<'PYTHON'
+import os
+from dotenv import set_key
+project = os.environ.get('GOOGLE_CLOUD_PROJECT', '')
+if not project or project == '自分のプロジェクトID':
+    raise SystemExit('先に実際のGOOGLE_CLOUD_PROJECTを設定してください')
+set_key('.env', 'GOOGLE_CLOUD_PROJECT', project)
+PYTHON
 ```
 
-次に、Cloud Shell の「エディターを開く（Open Editor）」を押します。フォルダーを選択する画面が出たら、ホームフォルダーにある `devfest-okayama-ai-assistant` を開きます。
+Cloud Shellエディターで `.env` を開き、プロジェクトIDと `GOOGLE_CLOUD_LOCATION=global` を確認します。モデル名、TTSの声 `Kore`、最初のオウム返し用の `COMPANION_MODE=echo` はひな形のままです。設定はVertex AI＋ADCのみです。
 
-下の画面では、左側の「Open Folder」から作業フォルダーを選びます。
+![Cloud Shellエディターでフォルダーを開く位置](docs/images/cloud-shell-open-folder.png)
 
-![Cloud Shell エディターの左側にある「Open Folder」ボタン](docs/images/cloud-shell-open-folder.png)
-
-1. 左側のファイル一覧から `.env` を開きます。**`.env.template` ではありません。**
-2. `YOUR_GOOGLE_AI_STUDIO_API_KEY` の部分だけを、取得した API キーに置き換えます。
-3. `GOOGLE_GENAI_USE_VERTEXAI=False` は、そのままにします。
-4. `Ctrl+S`（Mac は `Command+S`）で保存します。
-
-設定する 2 行の形は次のとおりです。2 行目の値には、自分のキーを入れてください。
-
-```dotenv
-GOOGLE_GENAI_USE_VERTEXAI=False
-GOOGLE_API_KEY=YOUR_GOOGLE_AI_STUDIO_API_KEY
-```
-
-エディターで `.env` を開いた画面例です。画像のキーはひな形の文字列です。2 行目を自分のキーに置き換えます。画像には `character.py` も写っていますが、この段階ではまだなくて構いません。
-
-![ファイル一覧で .env を選び、GOOGLE_API_KEY を編集する画面例](docs/images/cloud-shell-env.png)
-
-このリポジトリでは、`.env` と `env/` は Git の管理対象から除外されています。API キーを `app.py` や `character.py` に書く必要はありません。
-
-> このハンズオンでは、`init.sh`、`set_env.sh`、`setupAPIkey.sh` は使いません。ここに書かれた手順と `.env` の設定だけで進めます。
+既存の環境変数は `.env` より優先されます。`.env` の変更後はサーバーを再起動してください。この手順では互換用の `init.sh` と `set_env.sh` は使いません。
 
 ### 2-4. Web サーバーを起動する
 
@@ -172,40 +164,40 @@ GOOGLE_API_KEY=YOUR_GOOGLE_AI_STUDIO_API_KEY
 次のコマンドを実行します。以降も、起動には同じコマンドを使います。
 
 ```bash
-python -m flask --app app run --host=0.0.0.0 --port=8080
+uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
-`Running on http://127.0.0.1:8080` など、`8080` を含む起動メッセージが表示されれば成功です。
+`Uvicorn running on http://0.0.0.0:8000` と `Application startup complete.`が表示されれば成功です。
 
 サーバーが動いている間、このターミナルにはアクセスログが表示されます。**入力待ちに戻らないのは正常です。そのまま起動しておきます。**
 
-このコマンドは `app.py` のアプリを読み込み、`.env` の設定を使って起動します。元の資料の `python app.py` はポート `5000` で起動するため、この README では Cloud Shell のプレビューと合わせて `8080` を明示しています。
+このコマンドはFastAPIアプリをポート8000で起動します。最初の画面は入力をオウム返ししますが、読み上げは最初からVertex AIのGemini TTSを利用します。
 
 ### 2-5. ブラウザーで表示する
 
 1. Cloud Shell の上部にある「ウェブでプレビュー（Web Preview）」を押します。
-2. 「ポート 8080 でプレビュー（Preview on port 8080）」を選びます。
+2. 「ポート 8000 でプレビュー（Preview on port 8000）」を選びます。
 3. 別のタブに、キャラクターと入力欄が表示されることを確認します。
 
 Cloud Shell 全体の画面例です。右上にある、青いターミナルアイコンの右隣の「ウェブでプレビュー」アイコンからメニューを開きます。下部の黒い領域がターミナルです。
 
 ![Cloud Shell の画面例。右上にプレビューのアイコン、下部にターミナルがあります。](docs/images/cloud-shell-overview.png)
 
-別のポートが選ばれている場合は、「ポートを変更（Change port）」で `8080` を指定します。ターミナルに表示される `127.0.0.1` のリンクを直接開くのではなく、**Cloud Shell のプレビュー機能から開いてください**。[プレビューの公式手順](https://docs.cloud.google.com/shell/docs/using-web-preview)
+別のポートが選ばれている場合は、「ポートを変更（Change port）」で `8000` を指定します。ターミナルに表示される `127.0.0.1` のリンクを直接開くのではなく、**Cloud Shell のプレビュー機能から開いてください**。[プレビューの公式手順](https://docs.cloud.google.com/shell/docs/using-web-preview)
 
 ### 2-6. 最初の動作を確認する
 
 **操作場所：** アプリのプレビュー画面。
 
-最初に表示される画面の例です。下部の左側が音声の選択欄、中央が入力欄、右側の矢印が送信ボタンです。画像では英語の音声が選ばれているため、次の手順で日本語に変更します。
+最初に表示される画面の例です。下部の左側が音声の選択欄、中央が入力欄、右側の矢印が送信ボタンです。旧画面の音声名とは異なり、現在はGemini TTSの声を選びます。
 
 ![黒猫のキャラクターと、音声選択欄・入力欄・送信ボタンがあるアプリの初期画面](docs/images/app-start.png)
 
-1. 入力欄の左にある音声の選択欄から、`Google 日本語 (ja-JP)` を選びます。表示名が少し違う場合は、日本語の Google 音声を選んでください。
+1. 音声の選択欄で `Kore` を選びます。日本語の文章は日本語で読み上げます。
 2. 入力欄に「こんにちは！」と入力します。
 3. 右側の送信ボタンを押します。Enter でも送信できます。改行は Shift+Enter です。
 
-**入力した「こんにちは！」がそのまま表示され、音声が流れ、口が動けば成功です。** まだ AI には接続していないので、オウム返しで問題ありません。
+**入力した「こんにちは！」がそのまま表示され、音声が流れ、口が動けば成功です。** 会話モデルはまだ使わず、オウム返しをGemini TTSで読み上げます。自動再生されない場合は、表示されたプレーヤーで再生してください。
 
 音声の選択欄が空の場合は、先に [音声に関する対処方法](#voice-trouble) を確認してください。
 
@@ -226,25 +218,49 @@ Cloud Shell のターミナル付近にある `＋` から、新しいターミ�
 | ターミナル   | 役割                                   | 入力するもの                    |
 | ------------ | -------------------------------------- | ------------------------------- |
 | ターミナル 1 | Web サーバーの起動・停止、エラーの確認 | Python の起動コマンド、`Ctrl+C` |
-| ターミナル 2 | Gemini CLI に開発を依頼する            | 日本語の指示文                  |
+| ターミナル 2 | Antigravity CLI に開発を依頼する            | 日本語の指示文                  |
 
 **ターミナル 2** で、次のコマンドを実行します。新しいターミナルでは、作業フォルダーと Python 環境を改めて指定します。
 
 ```bash
 cd ~/devfest-okayama-ai-assistant
-source env/bin/activate
-gemini
+source .venv/bin/activate
 ```
 
-Cloud Shell には Gemini CLI が用意されています。初回にテーマ、フォルダーの信頼確認、認証方法などを聞かれたら、内容を確認して進みます。Cloud Shell では通常、自動で認証されます。ログイン方法を聞かれた場合は「Login with Google」を選び、画面に従ってログインします。[インストール情報](https://geminicli.com/docs/get-started/installation/)・[認証の公式手順](https://geminicli.com/docs/get-started/authentication/)
+Cloud Shellでは、まず既存のCLIを確認します。
 
-日本語の依頼を入力できる画面になったら準備完了です。
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+agy --version
+agy models
+```
 
-> Gemini CLI のログインと、これから作るアプリの API キー設定は別です。CLI にログインできていても、アプリには `.env` の設定が必要です。
+`command not found` の場合のみ[公式インストール手順](https://antigravity.google/docs/getting-started?tab=cli)に従います。
+
+```bash
+curl -fsSL https://antigravity.google/cli/install.sh -o /tmp/antigravity-install.sh
+bash /tmp/antigravity-install.sh
+export PATH="$HOME/.local/bin:$PATH"
+agy --version
+```
+
+新しいターミナルでもプロジェクト・リージョン・ADC認証を設定してからCLIを起動します。
+
+```bash
+export GOOGLE_CLOUD_PROJECT='自分のプロジェクトID'
+export GOOGLE_CLOUD_LOCATION=global
+export AGY_ADC_AUTH=true
+bash scripts/antigravity.sh -p 'ファイルを変更せず、このリポジトリの構成を日本語で簡潔に説明してください。' --output-format json
+bash scripts/antigravity.sh
+```
+
+コード説明が出ることを確認します。スクリプトの既定モデルはCLI側のID `gemini-3.8-flash-medium` です。`agy models` で確認し、環境でIDが異なる場合は `ANTIGRAVITY_MODEL` でGemini 3.8 FlashのIDを指定できます。CLIはアプリの `.env` を読み込みません。以前APIキー用の `modelProvider: "gemini"` を設定した場合は、その指定をCLI設定から削除してADC認証に戻してください。[認証の公式手順](https://antigravity.google/docs/install?tab=cli)。
+
+CLIが起動している間は日本語の指示文を入力します。上の `agy --version` などのコマンドは通常のBashに入力します。
 
 ### 3-2. `character.py` を作ってもらう
 
-**操作場所：** ターミナル 2 の Gemini CLI の入力欄。
+**操作場所：** ターミナル 2 の Antigravity CLI の入力欄。
 
 次の指示文をまとめて貼り付け、送信します。複数行の貼り付けは、省略表示される場合があります。すべて貼り付けられていれば問題ありません。
 
@@ -265,7 +281,7 @@ LlmAgent のインスタンスを root_agent という変数に代入してく�
 
 今回はツールを追加せず、character.py だけを作成してください。
 既存のファイルや依存パッケージは変更しないでください。
-.env の内容や API キーを読み取ったり表示したりする必要はありません。
+認証情報のファイルを読み取ったり表示したりする必要はありません。
 Web サーバーの起動は自分で行います。
 ```
 
@@ -273,7 +289,7 @@ Web サーバーの起動は自分で行います。
 
 許可を求める画面の例です。変更対象のファイル名を確認してから、「Allow once」を選びます。
 
-![Gemini CLI が character.py への書き込みを確認し、Allow once が選択されている画面](docs/images/gemini-cli-allow-once.png)
+![旧CLIでcharacter.pyへの書き込みを許可する画面。現在のCLIでは表示が異なります](docs/images/gemini-cli-allow-once.png)
 
 ### 3-3. 作成されたファイルを確認する
 
@@ -295,9 +311,9 @@ root_agent = LlmAgent(
 )
 ```
 
-Gemini CLI でうまく作れない場合は、エディターで `character.py` を新規作成し、このコード全体を貼り付けて保存しても進められます。
+Antigravity CLI でうまく作れない場合は、エディターで `character.py` を新規作成し、このコード全体を貼り付けて保存しても進められます。
 
-> **資料からの更新点（2026 年 10 月 24 日確認）：** 元の資料は `gemini-2.5-flash` を使っています。現在、Gemini 2.5 系は過去の利用者にアクセスが制限されているため、本手順の例は `gemini-3.8-flash` にしています。開催時に講師からモデル名の指定があれば、この README 内の `model` の値をその名前に読み替えてください。[モデルの提供状況](https://ai.google.dev/gemini-api/docs/deprecations)・[Gemini 3.8 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash)
+> このアプリは `character.py` のADKエージェントを読み込み、会話とTTSに同じVertex AIのADC認証を使用します。モデルは `.env` の `GEMINI_MODEL=gemini-3.8-flash` を使います。`character.py` の編集後はサーバーを再起動してください。
 
 ### 3-4. AI の返答を確認する
 
@@ -306,7 +322,7 @@ Gemini CLI でうまく作れない場合は、エディターで `character.py`
 サーバーが停止していることを確認し、再び起動します。
 
 ```bash
-python -m flask --app app run --host=0.0.0.0 --port=8080
+uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
 プレビュー画面を再読み込みし、次のように話しかけます。
@@ -338,9 +354,9 @@ API の応答には時間がかかります。`Thinking...` の表示中は、�
 
 思いつかない場合は、そのまま次の例を使ってください。自分の案を作りたい場合は、[Gemini アプリ](https://gemini.google.com/app) に「AI アシスタントのキャラクター設定を考えて」と相談しても構いません。
 
-### 4-2. Gemini CLI に変更を依頼する
+### 4-2. Antigravity CLI に変更を依頼する
 
-**操作場所：** ターミナル 2 の Gemini CLI の入力欄。
+**操作場所：** ターミナル 2 の Antigravity CLI の入力欄。
 
 ```text
 character.py の root_agent に設定されている instruction だけを変更してください。
@@ -372,7 +388,7 @@ model、name、その他のファイルは変更しないでください。
 **ターミナル 1** で起動します。
 
 ```bash
-python -m flask --app app run --host=0.0.0.0 --port=8080
+uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
 プレビューを再読み込みし、「自己紹介して」「好きなことを教えて」などと話しかけます。
@@ -385,9 +401,9 @@ python -m flask --app app run --host=0.0.0.0 --port=8080
 
 ## 5. Google 検索を追加する
 
-### 5-1. Gemini CLI に検索機能を追加してもらう
+### 5-1. Antigravity CLI に検索機能を追加してもらう
 
-**操作場所：** ターミナル 2 の Gemini CLI の入力欄。
+**操作場所：** ターミナル 2 の Antigravity CLI の入力欄。
 
 次の指示文を貼り付けます。
 
@@ -453,7 +469,7 @@ google_search で調べてから答えてください。
 **ターミナル 1** で起動します。
 
 ```bash
-python -m flask --app app run --host=0.0.0.0 --port=8080
+uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
 プレビューを再読み込みし、次のように質問します。`YYYY年MM月DD日` は、ハンズオン当日の日付に置き換えてください。
@@ -465,7 +481,7 @@ python -m flask --app app run --host=0.0.0.0 --port=8080
 
 返答に含まれるニュースの日付や内容を、ブラウザーでも検索して確かめます。
 
-**検索の設定がコードに入り、エラーなく会話を続けられることを確認してください。** 検索するかどうかはモデルが判断します。このサンプル画面には検索履歴や検索結果の専用表示がないため、返答だけで検索の実行を断定できません。[Google 検索連携の動作](https://ai.google.dev/gemini-api/docs/google-search)
+**検索の設定がコードに入り、エラーなく会話を続けられることを確認してください。** 検索するかどうかはモデルが判断します。検索が実行されると出典リンクとGoogle Searchの候補を画面に表示します。専用表示がない返答だけでは、検索実行を断定しないでください。[Google 検索連携の動作](https://ai.google.dev/gemini-api/docs/google-search)
 
 確認できたら、ターミナル 1 で `Ctrl+C` を押して停止します。
 
@@ -543,7 +559,7 @@ devfest-okayama-ai-assistant/
 
 ### 6-4. アプリで使う画像を変更する
 
-**操作場所：** ターミナル 2 の Gemini CLI の入力欄。
+**操作場所：** ターミナル 2 の Antigravity CLI の入力欄。
 
 ```text
 キャラクターの画像を差し替えてください。
@@ -585,7 +601,7 @@ const closedMouthImg = "/static/images/Gemini_Generated_Image_close.png";
 **ターミナル 1** で起動します。
 
 ```bash
-python -m flask --app app run --host=0.0.0.0 --port=8080
+uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
 プレビューを再読み込みしてから、会話します。
@@ -608,10 +624,10 @@ python -m flask --app app run --host=0.0.0.0 --port=8080
 
 1. エディターで、変更したファイルを保存します。
 2. ターミナル 1 で `Ctrl+C` を押し、Web サーバーを停止します。
-3. ターミナル 2 の Gemini CLI に `/quit` と入力して終了します。
+3. ターミナル 2 の Antigravity CLI に `/exit` と入力して終了します。
 4. 必要であれば、エディターのファイル一覧から、作成した `character.py` や画像、変更したファイルをダウンロードして手元に保存します。
 
-`.env` には自分の API キーが入っています。成果物として共有するファイルには含めないでください。
+認証情報のJSONファイルや `.env` は成果物として共有しないでください。SAキーを作る必要はありません。
 
 ### 後日、続きから再開するとき
 
@@ -619,23 +635,23 @@ Cloud Shell を開き、ターミナル 1 で次のコマンドを実行しま�
 
 ```bash
 cd ~/devfest-okayama-ai-assistant
-source env/bin/activate
-python -m flask --app app run --host=0.0.0.0 --port=8080
+source .venv/bin/activate
+uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
-その後、ポート `8080` のウェブプレビューを開きます。**ファイルが残っていれば、再度の `git clone` や `.env` のコピーは不要です。**
+その後、ポート `8000` のウェブプレビューを開きます。**ファイルが残っていれば、再度の `git clone` や `.env` のコピーは不要です。**
 
 編集も再開する場合は、ターミナル 2 を追加して次を実行します。
 
 ```bash
 cd ~/devfest-okayama-ai-assistant
-source env/bin/activate
-gemini
+source .venv/bin/activate
+bash scripts/antigravity.sh
 ```
 
 ## 余裕があれば、もうひと工夫
 
-まずは 1 つだけ選び、Gemini CLI に依頼してみましょう。
+まずは 1 つだけ選び、Antigravity CLI に依頼してみましょう。
 
 - 画面の「AI Companion」を、自分のキャラクター名に変える
 - 背景やボタンの色を変える
@@ -646,59 +662,30 @@ gemini
 
 <a id="troubleshooting"></a>
 
-## うまく動かないとき
+## エラーが出た場合
 
-アプリ画面に `Sorry, something went wrong. Please try again.` と表示された場合は、**まずターミナル 1 のエラーメッセージを確認します。** 講師に相談するときは、止まった手順の番号とエラーを伝えてください。API キーが含まれる部分は見せないようにします。
+| 症状 | 確認事項 |
+| --- | --- |
+| 503／認証未設定 | `.env` の実際のプロジェクトID、ADC、起動ディレクトリ。設定後に再起動 |
+| 502／モデル呼び出し失敗 | サーバーログ、Vertex AI API有効化、実行者／SAの権限、モデル利用可否、`global`リージョン |
+| 429 | プロジェクトのクォータを確認し、時間を置いて再送信 |
+| `agy` が見つからない | `agy --version` と `PATH`、必要な場合のみ公式インストール |
+| CLIだけ認証に失敗 | 同じターミナルの `AGY_ADC_AUTH=true`、`GOOGLE_CLOUD_PROJECT`。CLIはアプリの `.env` を読み込まない |
+| プレビューが開かない | サーバー稼働、ポート8000、Cloud ShellのWeb preview |
+| 声が出ない | 音声プレーヤーで手動再生、ブラウザのミュート、端末音量。テキスト下の音声エラーも確認 |
 
-| 症状                                                          | 確認すること・対処                                                                                                                                                                                                |
-| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `destination path ... already exists`                         | コピー先のフォルダーがすでにあります。再開する場合は `cd ~/devfest-okayama-ai-assistant` で移動し、続きから進めます。                                                                                             |
-| `requirements.txt` や `app.py` が見つからない                 | 作業フォルダーが違う可能性があります。`cd ~/devfest-okayama-ai-assistant` を実行してからやり直します。                                                                                                            |
-| `No module named flask` / `No module named google.adk`        | `source env/bin/activate` を実行し、`python -m pip install -r requirements.txt` がエラーなく完了しているか確認します。                                                                                            |
-| インストール時に Python のバージョンや `numpy` のエラーが出る | `python --version` を確認します。この依存構成には Python 3.11 以上が必要です。3.10 以下や新しすぎる Python で失敗する場合は、講師に環境を確認してもらいます。                                                     |
-| `gemini: command not found`                                   | Cloud Shell のターミナルか確認します。Cloud Shell でも見つからない場合は、講師と [公式インストール手順](https://geminicli.com/docs/get-started/installation/) を確認します。                                      |
-| プレビューが開かない / 接続できない                           | ターミナル 1 でサーバーが起動中か、起動コマンドとプレビューの両方が `8080` かを確認します。                                                                                                                       |
-| `Address already in use`                                      | 同じポートでサーバーがすでに動いています。前に起動したターミナルに戻り、`Ctrl+C` で停止してから起動し直します。                                                                                                   |
-| `character.py` を作ったのにオウム返しのまま                   | ファイルが `app.py` と同じフォルダーにあるか、名前が正確に `character.py` かを確認し、保存後にサーバーを再起動します。                                                                                            |
-| `SyntaxError` / `IndentationError`                            | `character.py` の引用符、括弧、カンマ、行頭の空白を確認します。手順の完成例と比較するか、エラーを Gemini CLI に伝えて修正を依頼します。                                                                           |
-| API キーの不足・無効、`400` / `401` / `403`                   | `.env` のキーをひな形から置き換えたか、保存したか、`GOOGLE_GENAI_USE_VERTEXAI=False` か確認します。キー自体を表示せずに設定を見直し、サーバーを再起動します。権限や地域の制限が表示された場合は講師に相談します。 |
-| `404` / モデルが見つからない                                  | `character.py` の `model` のつづりを確認します。利用可能なモデルはアカウントや時期で変わるため、講師と [モデルの提供状況](https://ai.google.dev/gemini-api/docs/deprecations) を確認します。                      |
-| `429` / `RESOURCE_EXHAUSTED`                                  | 呼び出し回数などの上限に達している可能性があります。連続送信を止め、AI Studio で利用枠を確認します。時間を空けても直らない場合は、モデル・プロジェクトの利用条件を講師と確認します。                              |
-| 性格の変更が反映されない                                      | `character.py` の保存後にサーバーを再起動し、プレビューを再読み込みします。                                                                                                                                       |
-| 画像が表示されない / 話すと元の画像に戻る                     | `static/images/` の実際の名前と、HTML の 1 か所・JavaScript の 2 か所を比較します。大文字・小文字、`close` と `closed`、拡張子にも注意します。                                                                    |
 
 <a id="voice-trouble"></a>
 
-### 音声が出ない・音声の選択欄が空になる
-
-このサンプルは、ブラウザーが提供する音声のうち、**名前に `Google` を含む音声だけ**を選択欄に表示します。環境によっては利用できる音声がなく、送信後の処理でエラーになることもあります。
-
-1. Google Chrome で開いているか確認します。
-2. プレビューを再読み込みし、音声一覧が読み込まれるまで少し待ちます。
-3. 日本語の音声を選び直します。
-4. パソコンとタブのミュート、イヤホンの出力先を確認します。
-
-それでも音声一覧が空の場合は、講師に相談するか、ターミナル 2 の Gemini CLI に次の修正を依頼してください。
-
-```text
-static/app.js の音声選択を改善してください。
-現在は名前に Google を含む音声だけを表示していますが、利用可能な音声をすべて表示し、
-ja-JP の音声があれば優先して選択するようにしてください。
-音声が1件もない場合や選択肢がない場合にも例外を出さず、
-テキストの返答を読めるようにしてください。
-音声を使えない場合は口のアニメーションを開始しないでください。
-その他の機能は変更しないでください。
-```
-
-変更後は保存し、プレビューを再読み込みします。日本語の音声が環境に存在しない場合でも、テキストで会話を確認しながら先に進めます。
+音声はブラウザー内蔵TTSではなく、Vertex AIのGemini TTSです。音声生成に失敗しても会話のテキストは残ります。プレーヤーの手動再生、タブのミュート、端末の音量を確認してください。
 
 ## ファイルの役割
 
 | ファイル・フォルダー   | 役割                                                                                                                         |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `app.py`               | ブラウザーからのメッセージを受け取る Web サーバー。`character.py` がなければオウム返しし、あればエージェントを呼び出します。 |
+| `app.py`               | ブラウザーからのメッセージを受け取る Web サーバー。`COMPANION_MODE=echo`で `character.py` がなければオウム返しし、作成後はADKエージェントを呼び出します。 |
 | `character.py`         | ハンズオンで作成するファイル。モデル、名前、性格、利用するツールを設定します。                                               |
-| `.env`                 | 自分の API キーを保存するファイル。公開しません。                                                                            |
+| `.env`                 | Vertex AIのプロジェクト・モデル・音声を設定するファイル。                                                                            |
 | `.env.template`        | `.env` を作るためのひな形です。                                                                                              |
 | `requirements.txt`     | インストールする Python パッケージとバージョンの一覧です。                                                                   |
 | `templates/index.html` | アプリの画面と、最初に表示する画像を定義します。                                                                             |
@@ -713,3 +700,36 @@ ja-JP の音声があれば優先して選択するようにしてください�
 元のコード：[Harappa80/bwai-nara-companion-python](https://github.com/Harappa80/bwai-nara-companion-python)
 
 掲載画像の出典と元スライドの対応は、[画像の出典一覧](docs/images/SOURCES.md) にまとめています。
+
+## 接続と自動検証
+
+別のターミナルで仮想環境を有効にし、起動済みサーバーに対して実行します。実モデル利用の料金が発生します。
+
+```bash
+python scripts/check_connection.py
+```
+
+`character.py` 作成前はオウム返しとTTS、作成後はGemini会話とTTSを確認します。手順どおりの完成例は `examples/character_basic.py` と `examples/character_search.py` にあります。CLIでの生成が難しい場合は、それぞれを `character.py` にコピーして再起動できます。
+
+## 開発用の自動検証
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
+node tests/test_ui.cjs
+bash -n init.sh set_env.sh scripts/antigravity.sh
+```
+
+実ブラウザ検証は、起動済みサーバーに対して実行します。
+
+```bash
+npm ci
+npx playwright install chromium
+npm run test:e2e
+# 実際のVertex AIを使う検証（モデル利用料金が発生）
+LIVE_GEMINI=1 npm run test:e2e
+```
+
+既存のChromiumを使う場合は `CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e` と指定できます。スクリーンショットは既定で `/tmp/companion-e2e` に保存されます。既定のブラウザテストはAI応答のみfixtureにし、画面、音声デコード、口パク、履歴、障害復旧を確認します。実行結果と未検証の範囲は [検証記録](docs/verification.md) に記載しています。
+
+`init.sh` と `set_env.sh` は旧 `~/project_id.txt` を使う場合の互換用です。新規ハンズオンではステップ1〜7を使用します。

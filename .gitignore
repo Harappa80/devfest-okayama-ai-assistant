@@ -24,3 +24,9 @@ env/
 .DS_Store
 *.log
 *.sqlite3'
+
+.venv/
+.env.*
+!.env.template
+
+node_modules/
