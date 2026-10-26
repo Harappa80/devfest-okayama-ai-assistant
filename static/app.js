@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const response = await fetch('/config');
         if (!response.ok) throw new Error('Voice configuration failed');
         const config = await response.json();
-        voiceSelect.replaceChildren(...config.voices.map(voice => new Option(voice, voice)));
+        voiceSelect.replaceChildren(...config.voices.map(voice => new Option(config.voice_labels?.[voice] || voice, voice)));
         voiceSelect.value = config.default_voice;
     } catch (error) {
         audioStatus.textContent = '音声設定を取得できませんでした。ページを再読み込みしてください。';

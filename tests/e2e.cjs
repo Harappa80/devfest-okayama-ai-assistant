@@ -17,9 +17,11 @@ const path = require('node:path');
         const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
         const errors = [];
         const requests = [];
+        const speechRequests = [];
         page.on('pageerror', err => errors.push(err.message));
         page.on('request', request => {
             if (request.url() === `${base}/chat`) requests.push(request.postDataJSON());
+            if (request.url() === `${base}/tts`) speechRequests.push(request.postDataJSON());
         });
         if (!live) {
             // Real DOM, network and audio decoder; only upstream AI responses are fixtures.
@@ -32,8 +34,12 @@ const path = require('node:path');
             await page.route(`${base}/chat`, route => route.fulfill({ json: { response: '桃太郎ラボ' } }));
             await page.route(`${base}/tts`, route => route.fulfill({ body: wav, contentType: 'audio/wav' }));
         }
+        const config = await (await page.request.get(`${base}/config`)).json();
+        assert.equal(config.voices.filter(voice => !voice.startsWith('voice_')).length, 30);
         await page.goto(base);
-        await page.waitForFunction(() => document.querySelector('#voice-select').options.length === 30);
+        await page.waitForFunction(count => document.querySelector('#voice-select').options.length === count, config.voices.length);
+        assert.equal(await page.locator('#voice-select').inputValue(), config.default_voice);
+        assert.equal(await page.locator('#voice-select option:checked').textContent(), config.voice_labels?.[config.default_voice] || config.default_voice);
         assert.ok((await page.locator('#character-image').boundingBox()).width > 350);
         await page.screenshot({ path: path.join(output, 'desktop-welcome.png'), fullPage: true });
         for (const [index, message] of [
@@ -51,6 +57,7 @@ const path = require('node:path');
             const speechResponse = await speech;
             assert.ok(speechResponse, 'TTS response did not arrive');
             assert.equal(speechResponse.status(), 200);
+            assert.equal(speechRequests[index].voice, index === 0 ? config.default_voice : 'Leda');
             await page.waitForFunction(() => document.querySelector('#speech-audio').currentTime > 0.2);
             assert.equal(await page.locator('#speech-audio').isVisible(), false, 'No replay player in the main UI');
             assert.equal(await page.locator('#play-audio').isVisible(), false);
