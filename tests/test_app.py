@@ -59,14 +59,17 @@ def test_tts_returns_wav_without_double_header(api):
         out.writeframes(b'\0\0'*240)
     wav = buffer.getvalue()
     sdk.aio.models.generate_content.return_value = types.GenerateContentResponse(candidates=[types.Candidate(content=types.Content(parts=[types.Part(inline_data=types.Blob(mime_type='audio/wav', data=wav))]))])
-    response = http.post('/tts', json={'text': 'こんにちは', 'voice': 'Puck'})
-    assert response.status_code == 200
-    assert response.content == wav
-    assert response.headers['content-type'] == 'audio/wav'
-    assert response.headers['cache-control'] == 'no-store'
-    call = sdk.aio.models.generate_content.call_args.kwargs
-    assert call['model'] == 'gemini-3.8-flash-tts'
-    assert call['config'].speech_config.voice_config.voice == 'Puck'
+    voices = http.get('/config').json()['voices']
+    assert len(voices) == len(set(voices)) == 30
+    for voice in voices:
+        response = http.post('/tts', json={'text': 'こんにちは', 'voice': voice})
+        assert response.status_code == 200
+        assert response.content == wav
+        assert response.headers['content-type'] == 'audio/wav'
+        assert response.headers['cache-control'] == 'no-store'
+        call = sdk.aio.models.generate_content.call_args.kwargs
+        assert call['model'] == 'gemini-3.8-flash-tts'
+        assert call['config'].speech_config.voice_config.voice == voice
     assert http.post('/tts', json={'text': 'hi', 'voice': 'unknown'}).status_code == 422
 
 

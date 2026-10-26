@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 import logging
 import os
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -27,7 +27,15 @@ SYSTEM_INSTRUCTION = os.getenv(
     "You are WakuWaku, a friendly AI companion. Reply in the user's language. "
     "Keep answers concise and natural for spoken conversation.",
 )
-VOICES = ("Kore", "Puck", "Charon", "Fenrir", "Aoede")
+Voice = Literal[
+    "Achernar", "Achird", "Algenib", "Algieba", "Alnilam", "Aoede",
+    "Autonoe", "Callirrhoe", "Charon", "Despina", "Enceladus", "Erinome",
+    "Fenrir", "Gacrux", "Iapetus", "Kore", "Laomedeia", "Leda", "Orus", "Puck",
+    "Pulcherrima", "Rasalgethi", "Sadachbia", "Sadaltager", "Schedar", "Sulafat",
+    "Umbriel", "Vindemiatrix", "Zephyr", "Zubenelgenubi",
+]
+# Keep the dropdown and request validation in sync with one voice definition.
+VOICES = get_args(Voice)
 DEFAULT_VOICE = os.getenv("GEMINI_TTS_VOICE", "Kore")
 if DEFAULT_VOICE not in VOICES:
     raise ValueError(f"GEMINI_TTS_VOICE must be one of: {', '.join(VOICES)}")
@@ -57,7 +65,7 @@ class ChatResponse(BaseModel):
 
 class SpeechRequest(BaseModel):
     text: Text
-    voice: Literal["Kore", "Puck", "Charon", "Fenrir", "Aoede"] = DEFAULT_VOICE
+    voice: Voice = DEFAULT_VOICE
 
 
 @asynccontextmanager

@@ -33,14 +33,14 @@ const path = require('node:path');
             await page.route(`${base}/tts`, route => route.fulfill({ body: wav, contentType: 'audio/wav' }));
         }
         await page.goto(base);
-        await page.waitForFunction(() => document.querySelector('#voice-select').options.length === 5);
+        await page.waitForFunction(() => document.querySelector('#voice-select').options.length === 30);
         assert.ok((await page.locator('#character-image').boundingBox()).width > 350);
         await page.screenshot({ path: path.join(output, 'desktop-welcome.png'), fullPage: true });
         for (const [index, message] of [
             '合言葉は「桃太郎ラボ」です。日本語の一文で確認してください。',
             'さっきの合言葉だけを答えてください。',
         ].entries()) {
-            if (index === 1) await page.selectOption('#voice-select', 'Puck');
+            if (index === 1) await page.selectOption('#voice-select', 'Leda');
             await page.fill('#text-input', message);
             const chat = page.waitForResponse(r => r.url() === `${base}/chat`, { timeout: 300000 });
             const speech = page.waitForResponse(r => r.url() === `${base}/tts`, { timeout: 300000 }).catch(() => null);

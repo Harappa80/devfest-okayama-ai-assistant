@@ -192,6 +192,8 @@ Cloud Shell 全体の画面例です。右上にある、青いターミナル�
 
 入力はテキストのみです。マイク入力・音声認識は使いません。「読み上げ」の選択欄は、キャラクターが返答する声を切り替えるものです。
 
+[Gemini TTSの標準音声30種類](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/text-to-speech/overview#prebuilt-voices)をアルファベット順に表示します。初期値は `Kore` で、`.env` の `GEMINI_TTS_VOICE` から変更できます。
+
 ![黒猫のキャラクターと、音声選択欄・入力欄・送信ボタンがあるアプリの初期画面](docs/images/app-start.png)
 
 1. 音声の選択欄で `Kore` を選びます。日本語の文章は日本語で読み上げます。
