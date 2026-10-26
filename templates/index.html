@@ -2,31 +2,76 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WakuWaku</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
+    <meta name="theme-color" content="#f7f9f8">
+    <title>AI Companion — WakuWaku</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <div class="chat-container">
-        <header class="chat-header">
-            <h1>AI Companion</h1>
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="brand">
+                <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 2.8 7.2L22 12l-7.2 2.8L12 22l-2.8-7.2L2 12l7.2-2.8Z"/></svg></span>
+                <div><h1>AI Companion</h1><p>あなたの、話せるAIアシスタント。</p></div>
+            </div>
+            <div class="header-actions">
+                <button id="show-history" class="quiet-button" type="button" aria-haspopup="dialog">会話の履歴</button>
+                <button id="new-chat" class="quiet-button" type="button"><span aria-hidden="true">＋</span> 新しい会話</button>
+            </div>
         </header>
-        <div class="character-viewer">
-            <img id="character-image" src="/static/images/char-mouth-closed.png" alt="WakuWaku">
-        </div>
-        <p id="status" aria-live="polite">Ask me something!</p>
-        <nav id="sources" aria-label="検索の出典"></nav>
-        <iframe id="search-suggestions" title="Google Search suggestions" sandbox="allow-popups allow-popups-to-escape-sandbox" hidden></iframe>
-        <audio id="speech-audio" controls hidden></audio>
-        <p id="audio-status" role="status"></p>
-        <footer class="chat-input-area">
-            <select id="voice-select" aria-label="音声"><option value="Kore">Kore</option></select>
-            <textarea maxlength="8000" aria-label="メッセージ" id="text-input" placeholder="Ask me anything..."></textarea>
-            <button id="send-button" aria-label="送信">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24px" height="24px"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-            </button>
-        </footer>
+
+        <main class="companion-stage" aria-label="AIキャラクターと話す">
+            <header class="stage-header">
+                <p class="eyebrow">YOUR AI COMPANION</p>
+                <p id="status" role="status">会話をはじめましょう</p>
+            </header>
+            <div class="character-scene">
+                <div id="character-viewer" class="character-viewer">
+                    <img id="character-image" src="/static/images/char-mouth-closed.png" alt="AIアシスタントのアバター">
+                    <span class="voice-indicator" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+                </div>
+            </div>
+            <div class="reply-bubble">
+                <p id="reply-text" tabindex="0" aria-live="polite">こんにちは。今日は、どんなお話をしましょう？</p>
+                <button id="reply-sources" type="button" class="source-button" aria-haspopup="dialog" hidden>検索の出典を見る ↗</button>
+            </div>
+            <div id="welcome" class="suggestions" aria-label="会話のきっかけ">
+                <button type="button" data-prompt="まずは自己紹介をしてくれる？">まずは自己紹介 <span aria-hidden="true">↗</span></button>
+                <button type="button" data-prompt="週末を楽しく過ごすアイデアを、一緒に考えて。">週末のアイデア <span aria-hidden="true">↗</span></button>
+                <button type="button" data-prompt="少し気分転換したいので、楽しい話をしてくれる？">ひと息つこう <span aria-hidden="true">↗</span></button>
+            </div>
+
+            <footer class="composer-area">
+                <div id="audio-panel" class="audio-panel" hidden>
+                    <span>もう一度、聴く</span>
+                    <audio id="speech-audio" controls aria-label="最新の返答の音声"></audio>
+                </div>
+                <p id="audio-status" role="status"></p>
+                <div class="composer">
+                    <label class="sr-only" for="text-input">メッセージ</label>
+                    <textarea id="text-input" rows="1" maxlength="8000" placeholder="ひとこと、話しかけてみよう…" aria-describedby="input-hint"></textarea>
+                    <div class="composer-tools">
+                        <label class="voice-control" for="voice-select">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11 5 6 9H3v6h3l5 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg>
+                            <span>声</span><select id="voice-select"><option value="Kore">Kore</option></select>
+                        </label>
+                        <button id="send-button" type="button" aria-label="メッセージを送信" disabled>
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <p id="input-hint" class="input-hint">文字で話しかけると、声でお返事します。<span> Enterで送信 · Shift + Enterで改行</span></p>
+            </footer>
+        </main>
     </div>
+
+    <dialog id="history-dialog" aria-labelledby="history-title">
+        <header class="history-header"><h2 id="history-title">会話の履歴</h2><button id="close-history" class="quiet-button" type="button" autofocus>閉じる</button></header>
+        <div id="conversation" tabindex="0" aria-label="会話の履歴">
+            <div id="messages" role="log" aria-label="メッセージ"></div>
+            <p class="empty-history">ここに、あなたとAIの会話が残ります。</p>
+        </div>
+    </dialog>
     <script src="/static/app.js"></script>
 </body>
 </html>
