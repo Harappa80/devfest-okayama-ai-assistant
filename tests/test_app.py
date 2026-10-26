@@ -10,6 +10,14 @@ from google.genai import errors, types
 import app as backend
 
 
+@pytest.fixture(autouse=True)
+def isolate_workshop_config(monkeypatch):
+    # Tests also run after the hands-on has created .env and character.py.
+    monkeypatch.setenv('COMPANION_MODE', 'gemini')
+    monkeypatch.setenv('GOOGLE_CLOUD_PROJECT', 'your-project-id')
+    monkeypatch.setattr(backend, 'load_runner', lambda *args: None)
+
+
 @pytest.fixture
 def api():
     client = MagicMock()

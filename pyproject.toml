@@ -1,0 +1,26 @@
+[project]
+name = "devfest-okayama-ai-assistant"
+version = "0.1.0"
+description = "FastAPI and Vertex AI companion workshop"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.162.0",
+    "google-adk==2.13.0",
+    "google-genai==2.33.0",
+    "python-dotenv==1.2.4",
+    "uvicorn==0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1,<1",
+    "pytest>=8,<10",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -1,14 +1,40 @@
 # ハンズオン検証記録
 
+## 2026-10-26：uvへの移行
+
+依存管理を `pyproject.toml`／`uv.lock` に統一し、`.python-version` は3.12としました。旧依存ファイルと互換用セットアップスクリプトは削除しました。現行の実行手順はREADMEを参照してください。
+
+既存の仮想環境・`.env`を含めない新しいディレクトリにソースとlockfileをコピーし、uv 0.12.23／Python 3.12.14で次を実行しました。
+
+| 確認 | 結果 |
+| --- | --- |
+| `uv lock --check` | lockfileと依存宣言の整合性を確認 |
+| `uv sync --locked` | 新規`.venv`へ52パッケージを導入。`uv pip check`も成功 |
+| `uv run --locked pytest -q` | 22件成功。`.env`作成後も成功。旧スクリプト専用の2件はスクリプトとともに削除 |
+| `node tests/test_ui.cjs` | 成功 |
+| Chromiumによるfixture E2E | 履歴、WAVデコード・再生、口パク、PC／モバイル表示、障害復旧を確認 |
+| `uv run --locked python app.py` | 起動と終了を確認（検証用ポート8010） |
+| `uv run --locked python scripts/check_connection.py --base-url http://127.0.0.1:8010` | ページ・設定・画像・OpenAPIすべて200。オウム返し200、Vertex AI TTS 200、24 kHz／3.20秒のWAV |
+| 旧Flask環境の整理 | 検証用環境にFlask 3.1.2を追加後、`uv sync --locked`でFlaskと不要な依存が除去されることを確認。FastAPIのimportも成功 |
+| README | Bash／Pythonコードの構文、画像リンク、旧インストール手順が残っていないことを確認 |
+
+モックAPIテストは教材用の`.env`／`character.py`から独立させました。新しいuvコマンドでpytestを実行できるよう、テスト時のモジュール探索パスも設定しました。Starlette TestClientのhttpx移行に関する非推奨警告1件は残っています。
+
+今回の変更は依存管理と手順の整理です。Cloud ShellでのCLI認証・Web preview操作、およびmacOS上の実行はこのLinux環境では再検証していません。
+
+## 2026-10-24：移行前の検証履歴
+
+以下はuv導入前に実行した検証の記録です。ここに記載された旧セットアップのコマンドは現行手順ではありません。
+
 検証日：2026-10-24（日本時間）。実行環境はCodexのLinuxクラウド環境であり、Google Cloud Shellそのものではありません。Cloud Shellの画面操作・CLI起動を実行済みとは扱いません。
 
-## 方法
+### 方法
 
 作業ディレクトリに既存の `venv`／`.venv` があることに依存しないよう、アプリ・画像・設定テンプレート・スクリプト・テストを `/tmp` の新しいディレクトリにコピーし、新規 `.venv` を `python -m venv` で作成しました。READMEと同じ `pip install -r requirements.txt`、`.env.template` のコピー、プロジェクト設定、Uvicorn起動を実行しました。認証は接続済みSAのWorkload Identity／ADCで、APIキーは使っていません。
 
 環境：Python 3.12.14、Node.js 24.19.0、Chromium 154、Playwright 1.64.1。Python 3.11での実行は未確認です。
 
-## 実行結果
+### 実行結果
 
 | 手順 | 結果・証拠 |
 | --- | --- |
@@ -31,7 +57,7 @@
 
 CLI引数転送のテストには記録用スタブを使っています。これはAntigravity CLI本体の実行確認ではありません。実ブラウザによる再生の進行は確認しましたが、物理スピーカーを人が聴く確認はしていません。
 
-## 発見して修正した点
+### 発見して修正した点
 
 - 前のREADMEにはCloud ShellのWebプレビュー手順がありませんでした。ポート8000での起動・プレビュー・別ターミナル・再起動・終了を含む順序に書き直しました。
 - 認証をVertex AI＋ADCに固定し、APIキー設定用スクリプトを削除しました。古いAPIキー環境変数が残っていてもADCを明示指定することを自動テストしました。
@@ -40,7 +66,7 @@ CLI引数転送のテストには記録用スタブを使っています。こ�
 - 外部Webフォントへの依存を外し、通信制限があってもローカルフォントで表示できるようにしました。
 - CLIのモデル名をAPIのモデル設定から分離し、公式headless例の `gemini-3.8-flash-medium` を既定にしました。`ANTIGRAVITY_MODEL` で変更でき、実環境の `agy models` で確認する手順を加えました。
 
-## Cloud Shellで残る確認
+### Cloud Shellで残る確認
 
 次はこの環境から実行できていません。
 
@@ -53,11 +79,11 @@ CLI引数転送のテストには記録用スタブを使っています。こ�
 
 Cloud Shell上ではREADMEのステップ1〜7を実行し、特にステップ3のCLIとステップ2のWeb previewを確認してください。
 
-## 教材との照合
+### 教材との照合
 
 作業開始時のローカルHEADより新しいリモートの教材コミット `0ef7e4a` を確認し、そのREADME・13枚の画面例・出典一覧を取り込みました。性格変更・Google検索・アバター差し替えの学習段階を保持しています。APIキー用の設定画面は現行手順から除外し、過去の参考画像としてファイルを保存しています。リポジトリがprivateであるため、参加者のGitHub認証とアクセス権がcloneの前提になることも追記しました。
 
-## 教材の段階ごとの追加実行
+### 教材の段階ごとの追加実行
 
 - `COMPANION_MODE=echo`、`character.py`なし：完全一致のオウム返し200、Vertex TTSは24 kHz／1.04秒のWAV。
 - `examples/character_basic.py`を`character.py`へコピーして再起動：ADKで2往復とも会話200／TTS 200。1回目は209,308 bytes／4.20秒、2回目は80,668 bytes／1.52秒。履歴から合言葉を想起し、Kore→Puck、停止・再開、口パク、PC／モバイル表示を実ブラウザで確認。

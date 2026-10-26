@@ -82,13 +82,16 @@ gcloud auth application-default login --impersonate-service-account=YOUR_SA@YOUR
 
 ターミナルは、コマンドを入力して操作する画面です。ここから先のコマンドは、**手元のパソコンのターミナルではなく、Cloud Shell のターミナル**に入力します。
 
-まず、次のコマンドで Python のバージョンを確認します。
+Python環境と依存関係は [uv](https://docs.astral.sh/uv/) で管理します。まず `uv --version` を確認します。uvが未導入なら、macOS／Linux用の[公式インストーラー](https://docs.astral.sh/uv/getting-started/installation/)で導入します。
 
 ```bash
-python3 --version
+curl -LsSf https://astral.sh/uv/install.sh -o /tmp/uv-install.sh
+sh /tmp/uv-install.sh
+export PATH="$HOME/.local/bin:$PATH"
+uv --version
 ```
 
-このリポジトリの依存パッケージには Python 3.11 以上が必要です。Python 3.11 または 3.12 の環境を使ってください。3.10 以下が表示された場合は、このまま進めず講師に相談してください。
+リポジトリの `.python-version` でPython 3.12を指定しています。必要なPythonと専用環境はuvが用意するため、別途Pythonをインストールする操作は不要です。
 
 <a id="step-2"></a>
 
@@ -116,23 +119,19 @@ cd ~/devfest-okayama-ai-assistant
 ls
 ```
 
-`app.py`、`requirements.txt`、`static`、`templates` などが表示されれば成功です。**この時点で `character.py` がないのは正常です。この後の手順で作成します。**
+`app.py`、`pyproject.toml`、`static`、`templates` などが表示されれば成功です。**この時点で `character.py` がないのは正常です。この後の手順で作成します。**
 
 ### 2-2. Python の実行環境を作る
 
-同じターミナルで、次のコマンドを 1 行ずつ実行します。
+同じターミナルで実行します。
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
+uv sync --locked
 ```
 
-- 1 行目：このアプリ専用の Python 環境を `.venv` フォルダーに作ります。
-- 2 行目：その環境を有効にします。入力行の先頭に `(.venv)` が表示されます。
-- 3 行目：アプリに必要なパッケージをインストールします。完了まで数分かかる場合があります。
+uvが `.venv` を作り、`uv.lock` に記録されたバージョンの依存パッケージと開発用テストツールをインストールします。仮想環境を手動で有効化する操作は不要です。以降のPythonコマンドは `uv run --locked` を付けて実行します。
 
-インストール中は文字が流れます。再びコマンドを入力できる状態に戻るまで待ちます。`ERROR` が表示された場合は、次へ進む前に [対処方法](#troubleshooting) を確認してください。
+インストールがエラーなく完了してから次に進みます。既存チェックアウトを更新する場合も、`git pull --ff-only origin main` の後に `uv sync --locked` を実行してください。
 
 ### 2-3. Vertex AIの設定ファイルを作る
 
@@ -141,7 +140,7 @@ python -m pip install -r requirements.txt
 ```bash
 cp .env.template .env
 chmod 600 .env
-python - <<'PYTHON'
+uv run --locked python - <<'PYTHON'
 import os
 from dotenv import set_key
 project = os.environ.get('GOOGLE_CLOUD_PROJECT', '')
@@ -155,7 +154,7 @@ Cloud Shellエディターで `.env` を開き、プロジェクトIDと `GOOGLE
 
 ![Cloud Shellエディターでフォルダーを開く位置](docs/images/cloud-shell-open-folder.png)
 
-既存の環境変数は `.env` より優先されます。`.env` の変更後はサーバーを再起動してください。この手順では互換用の `init.sh` と `set_env.sh` は使いません。
+既存の環境変数は `.env` より優先されます。`.env` の変更後はサーバーを再起動してください。
 
 ### 2-4. Web サーバーを起動する
 
@@ -164,7 +163,7 @@ Cloud Shellエディターで `.env` を開き、プロジェクトIDと `GOOGLE
 次のコマンドを実行します。以降も、起動には同じコマンドを使います。
 
 ```bash
-uvicorn app:app --host 0.0.0.0 --port 8000
+uv run --locked uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
 `Uvicorn running on http://0.0.0.0:8000` と `Application startup complete.`が表示されれば成功です。
@@ -220,11 +219,11 @@ Cloud Shell のターミナル付近にある `＋` から、新しいターミ�
 | ターミナル 1 | Web サーバーの起動・停止、エラーの確認 | Python の起動コマンド、`Ctrl+C` |
 | ターミナル 2 | Antigravity CLI に開発を依頼する            | 日本語の指示文                  |
 
-**ターミナル 2** で、次のコマンドを実行します。新しいターミナルでは、作業フォルダーと Python 環境を改めて指定します。
+**ターミナル 2** で、次のコマンドを実行します。新しいターミナルでも、作業フォルダーに移動して依存関係を確認します。
 
 ```bash
 cd ~/devfest-okayama-ai-assistant
-source .venv/bin/activate
+uv sync --locked
 ```
 
 Cloud Shellでは、まず既存のCLIを確認します。
@@ -265,7 +264,7 @@ CLIが起動している間は日本語の指示文を入力します。上の `
 次の指示文をまとめて貼り付け、送信します。複数行の貼り付けは、省略表示される場合があります。すべて貼り付けられていれば問題ありません。
 
 ```text
-このプロジェクトの app.py と requirements.txt を確認し、app.py と同じフォルダーに
+このプロジェクトの app.py と pyproject.toml を確認し、app.py と同じフォルダーに
 character.py を作成してください。
 
 google.adk.agents.llm_agent から LlmAgent をインポートし、
@@ -322,7 +321,7 @@ Antigravity CLI でうまく作れない場合は、エディターで `characte
 サーバーが停止していることを確認し、再び起動します。
 
 ```bash
-uvicorn app:app --host 0.0.0.0 --port 8000
+uv run --locked uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
 プレビュー画面を再読み込みし、次のように話しかけます。
@@ -388,7 +387,7 @@ model、name、その他のファイルは変更しないでください。
 **ターミナル 1** で起動します。
 
 ```bash
-uvicorn app:app --host 0.0.0.0 --port 8000
+uv run --locked uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
 プレビューを再読み込みし、「自己紹介して」「好きなことを教えて」などと話しかけます。
@@ -469,7 +468,7 @@ google_search で調べてから答えてください。
 **ターミナル 1** で起動します。
 
 ```bash
-uvicorn app:app --host 0.0.0.0 --port 8000
+uv run --locked uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
 プレビューを再読み込みし、次のように質問します。`YYYY年MM月DD日` は、ハンズオン当日の日付に置き換えてください。
@@ -601,7 +600,7 @@ const closedMouthImg = "/static/images/Gemini_Generated_Image_close.png";
 **ターミナル 1** で起動します。
 
 ```bash
-uvicorn app:app --host 0.0.0.0 --port 8000
+uv run --locked uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
 プレビューを再読み込みしてから、会話します。
@@ -635,8 +634,8 @@ Cloud Shell を開き、ターミナル 1 で次のコマンドを実行しま�
 
 ```bash
 cd ~/devfest-okayama-ai-assistant
-source .venv/bin/activate
-uvicorn app:app --host 0.0.0.0 --port 8000
+uv sync --locked
+uv run --locked uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
 その後、ポート `8000` のウェブプレビューを開きます。**ファイルが残っていれば、再度の `git clone` や `.env` のコピーは不要です。**
@@ -645,7 +644,7 @@ uvicorn app:app --host 0.0.0.0 --port 8000
 
 ```bash
 cd ~/devfest-okayama-ai-assistant
-source .venv/bin/activate
+uv sync --locked
 bash scripts/antigravity.sh
 ```
 
@@ -663,6 +662,8 @@ bash scripts/antigravity.sh
 <a id="troubleshooting"></a>
 
 ## エラーが出た場合
+
+`ModuleNotFoundError: No module named flask` が出る場合は、手元の `app.py` が移行前のコードです。作業フォルダーで `git switch main`、`git pull --ff-only origin main`、`uv sync --locked` の順に更新します。ローカルでの起動は `uv run --locked python app.py`、表示先は [http://127.0.0.1:8000](http://127.0.0.1:8000) です。
 
 | 症状 | 確認事項 |
 | --- | --- |
@@ -687,7 +688,9 @@ bash scripts/antigravity.sh
 | `character.py`         | ハンズオンで作成するファイル。モデル、名前、性格、利用するツールを設定します。                                               |
 | `.env`                 | Vertex AIのプロジェクト・モデル・音声を設定するファイル。                                                                            |
 | `.env.template`        | `.env` を作るためのひな形です。                                                                                              |
-| `requirements.txt`     | インストールする Python パッケージとバージョンの一覧です。                                                                   |
+| `pyproject.toml`     | Pythonの要件とアプリ・開発用の依存関係です。                                                                   |
+| `uv.lock` | すべての依存パッケージの解決結果です。リポジトリで共有します。 |
+| `.python-version` | uvが使用するPythonのバージョンです。 |
 | `templates/index.html` | アプリの画面と、最初に表示する画像を定義します。                                                                             |
 | `static/app.js`        | メッセージ送信、返答表示、音声読み上げ、口のアニメーションを動かします。                                                     |
 | `static/style.css`     | 色や配置など、画面の見た目を設定します。                                                                                     |
@@ -703,10 +706,10 @@ bash scripts/antigravity.sh
 
 ## 接続と自動検証
 
-別のターミナルで仮想環境を有効にし、起動済みサーバーに対して実行します。実モデル利用の料金が発生します。
+別のターミナルでこのリポジトリに移動し、起動済みサーバーに対して実行します。実モデル利用の料金が発生します。
 
 ```bash
-python scripts/check_connection.py
+uv run --locked python scripts/check_connection.py
 ```
 
 `character.py` 作成前はオウム返しとTTS、作成後はGemini会話とTTSを確認します。手順どおりの完成例は `examples/character_basic.py` と `examples/character_search.py` にあります。CLIでの生成が難しい場合は、それぞれを `character.py` にコピーして再起動できます。
@@ -714,10 +717,10 @@ python scripts/check_connection.py
 ## 開発用の自動検証
 
 ```bash
-python -m pip install -r requirements-dev.txt
-python -m pytest -q
+uv sync --locked
+uv run --locked pytest -q
 node tests/test_ui.cjs
-bash -n init.sh set_env.sh scripts/antigravity.sh
+bash -n scripts/antigravity.sh
 ```
 
 実ブラウザ検証は、起動済みサーバーに対して実行します。
@@ -732,4 +735,4 @@ LIVE_GEMINI=1 npm run test:e2e
 
 既存のChromiumを使う場合は `CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e` と指定できます。スクリーンショットは既定で `/tmp/companion-e2e` に保存されます。既定のブラウザテストはAI応答のみfixtureにし、画面、音声デコード、口パク、履歴、障害復旧を確認します。実行結果と未検証の範囲は [検証記録](docs/verification.md) に記載しています。
 
-`init.sh` と `set_env.sh` は旧 `~/project_id.txt` を使う場合の互換用です。新規ハンズオンではステップ1〜7を使用します。
+依存を変更する開発作業では `uv add パッケージ名`（開発用は `uv add --dev パッケージ名`）を使い、`pyproject.toml` と `uv.lock` を一緒にcommitします。
