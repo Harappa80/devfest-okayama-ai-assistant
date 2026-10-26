@@ -2,10 +2,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const textInput = document.getElementById('text-input');
     const sendButton = document.getElementById('send-button');
     const characterImage = document.getElementById('character-image');
+    const characterViewer = document.getElementById('character-viewer');
     const voiceSelect = document.getElementById('voice-select');
     const status = document.getElementById('status');
+    const replyText = document.getElementById('reply-text');
     const audio = document.getElementById('speech-audio');
     const audioStatus = document.getElementById('audio-status');
+    const playAudio = document.getElementById('play-audio');
     const sources = document.getElementById('sources');
     const searchSuggestions = document.getElementById('search-suggestions');
     const openMouthImg = '/static/images/char-mouth-open.png';
@@ -18,9 +21,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const stopLipSync = () => {
         clearInterval(lipSyncInterval);
         characterImage.src = closedMouthImg;
+        characterViewer.dataset.speaking = 'false';
     };
     audio.addEventListener('playing', () => {
         stopLipSync();
+        characterViewer.dataset.speaking = 'true';
         let mouthOpen = false;
         lipSyncInterval = setInterval(() => {
             mouthOpen = !mouthOpen;
@@ -28,6 +33,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 150);
     });
     ['pause', 'ended', 'error', 'waiting'].forEach(event => audio.addEventListener(event, stopLipSync));
+    // A one-time action only when the browser blocks automatic playback.
+    playAudio.addEventListener('click', async () => {
+        try {
+            await audio.play();
+            playAudio.hidden = true;
+            audioStatus.textContent = '';
+        } catch {
+            audioStatus.textContent = '音声を再生できませんでした。ブラウザーの音声設定を確認してください。';
+        }
+    });
+    const updateInput = () => {
+        textInput.style.height = 'auto';
+        textInput.style.height = `${Math.min(textInput.scrollHeight, 120)}px`;
+        sendButton.disabled = busy || !textInput.value.trim();
+    };
 
     try {
         const response = await fetch('/config');
@@ -54,16 +74,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     const handleSendMessage = async () => {
         const message = textInput.value.trim();
         if (!message || busy) return;
+        const restoreFocus = document.activeElement === textInput;
         busy = true;
         sendButton.disabled = true;
         textInput.disabled = true;
         voiceSelect.disabled = true;
         audio.pause();
+        stopLipSync();
         audio.removeAttribute('src');
-        audio.hidden = true;
+        playAudio.hidden = true;
         if (audioUrl) URL.revokeObjectURL(audioUrl);
         audioStatus.textContent = '';
-        status.textContent = 'Thinking...';
+        status.textContent = '返答を考えています…';
+        status.dataset.busy = 'true';
+        status.dataset.error = 'false';
+        replyText.textContent = 'うーん、ちょっと考えています…';
         if (sources) sources.replaceChildren();
         if (searchSuggestions) { searchSuggestions.hidden = true; searchSuggestions.srcdoc = ''; }
         let replyReceived = false;
@@ -71,10 +96,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             const response = await post('/chat', { message, history });
             const data = await response.json();
             // Render model text literally, including any HTML-like content.
-            status.textContent = data.response;
+            replyText.textContent = data.response;
+            replyText.scrollTop = 0;
+            status.textContent = '返答しました';
             if (sources) {
                 for (const source of data.sources || []) {
-                    const url = new URL(source.url);
+                    let url;
+                    try { url = new URL(source.url); } catch { continue; }
                     if (!['https:', 'http:'].includes(url.protocol)) continue;
                     const link = document.createElement('a');
                     link.href = url.href;
@@ -92,17 +120,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             history.push({ role: 'user', text: message }, { role: 'model', text: data.response });
             history.splice(0, Math.max(0, history.length - 20));
             textInput.value = '';
-            textInput.style.height = '50px';
+            updateInput();
             audioStatus.textContent = '音声を生成しています…';
             const speech = await post('/tts', { text: data.response, voice: voiceSelect.value || 'Kore' });
             audioUrl = URL.createObjectURL(await speech.blob());
             audio.src = audioUrl;
-            audio.hidden = false;
             audioStatus.textContent = '';
             try {
                 await audio.play();
             } catch {
-                audioStatus.textContent = '再生ボタンを押して音声を再生してください。';
+                audioStatus.textContent = '自動再生がブロックされました。再生ボタンを押してください。';
+                playAudio.hidden = false;
             }
         } catch (error) {
             stopLipSync();
@@ -110,12 +138,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 audioStatus.textContent = `音声を生成できませんでした: ${error.message}`;
             } else {
                 status.textContent = error.message;
+                status.dataset.error = 'true';
+                replyText.textContent = 'うまく返答できませんでした。もう一度、送ってみてください。';
             }
         } finally {
             busy = false;
-            sendButton.disabled = false;
+            status.dataset.busy = 'false';
+            updateInput();
             textInput.disabled = false;
             voiceSelect.disabled = false;
+            if (restoreFocus && document.activeElement === document.body) textInput.focus({ preventScroll: true });
         }
     };
 
@@ -126,10 +158,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             handleSendMessage();
         }
     });
-    textInput.addEventListener('input', () => {
-        textInput.style.height = 'auto';
-        textInput.style.height = `${textInput.scrollHeight}px`;
-    });
+    textInput.addEventListener('input', updateInput);
     window.addEventListener('beforeunload', () => {
         audio.pause();
         stopLipSync();

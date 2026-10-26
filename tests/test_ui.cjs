@@ -3,8 +3,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 async function run(ttsFails = false, autoplayBlocked = false) {
     const elements = {};
-    for (const id of ['text-input', 'send-button', 'character-image', 'voice-select', 'status', 'speech-audio', 'audio-status']) {
-        elements[id] = { value: '', style: {}, handlers: {}, textContent: '', hidden: false,
+    for (const id of ['text-input', 'send-button', 'character-image', 'character-viewer', 'voice-select', 'status', 'reply-text', 'speech-audio', 'audio-status', 'play-audio']) {
+        elements[id] = { value: '', style: {}, dataset: {}, handlers: {}, textContent: '', hidden: false,
             addEventListener(name, fn) { this.handlers[name] = fn; },
             replaceChildren() {}, removeAttribute() {}, pause() {},
             play: async () => { if (autoplayBlocked) throw new Error('autoplay blocked'); },
@@ -32,11 +32,17 @@ async function run(ttsFails = false, autoplayBlocked = false) {
     assert.equal(requests[0].url, '/chat');
     assert.equal(requests[1].url, '/tts');
     assert.equal(requests[1].body.voice, 'Kore');
-    assert.equal(elements.status.textContent, '<img src=x onerror=alert(1)>');
-    assert.equal(elements['send-button'].disabled, false);
+    assert.equal(elements['reply-text'].textContent, '<img src=x onerror=alert(1)>');
+    assert.equal(elements['text-input'].disabled, false);
+    assert.equal(elements['send-button'].disabled, true);
     if (ttsFails) assert.match(elements['audio-status'].textContent, /TTS unavailable/);
-    else assert.equal(elements['speech-audio'].hidden, false);
-    if (autoplayBlocked) assert.match(elements['audio-status'].textContent, /再生ボタン/);
+    else assert.equal(elements['play-audio'].hidden, !autoplayBlocked);
+    if (autoplayBlocked) {
+        assert.match(elements['audio-status'].textContent, /再生ボタン/);
+        autoplayBlocked = false;
+        await elements['play-audio'].handlers.click();
+        assert.equal(elements['play-audio'].hidden, true, 'Manual action disappears after playback starts');
+    }
     elements['text-input'].value = '続けて';
     await elements['send-button'].handlers.click();
     assert.equal(requests[2].body.history.length, 2);

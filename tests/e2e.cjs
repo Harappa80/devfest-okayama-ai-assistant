@@ -34,6 +34,8 @@ const path = require('node:path');
         }
         await page.goto(base);
         await page.waitForFunction(() => document.querySelector('#voice-select').options.length === 5);
+        assert.ok((await page.locator('#character-image').boundingBox()).width > 350);
+        await page.screenshot({ path: path.join(output, 'desktop-welcome.png'), fullPage: true });
         for (const [index, message] of [
             '合言葉は「桃太郎ラボ」です。日本語の一文で確認してください。',
             'さっきの合言葉だけを答えてください。',
@@ -50,6 +52,9 @@ const path = require('node:path');
             assert.ok(speechResponse, 'TTS response did not arrive');
             assert.equal(speechResponse.status(), 200);
             await page.waitForFunction(() => document.querySelector('#speech-audio').currentTime > 0.2);
+            assert.equal(await page.locator('#speech-audio').isVisible(), false, 'No replay player in the main UI');
+            assert.equal(await page.locator('#play-audio').isVisible(), false);
+            assert.equal(await page.locator('#character-viewer').getAttribute('data-speaking'), 'true');
             // Read the Blob used by the actual audio element, rather than a CDP media body.
             const audio = await page.locator('#speech-audio').evaluate(async element => {
                 const bytes = new Uint8Array(await (await fetch(element.src)).arrayBuffer());
@@ -66,15 +71,17 @@ const path = require('node:path');
             assert.equal(mouths.size, 2, 'Mouth must animate while audio plays');
             await page.locator('#speech-audio').evaluate(element => element.pause());
             assert.match(await page.locator('#character-image').getAttribute('src'), /closed/);
+            assert.equal(await page.locator('#character-viewer').getAttribute('data-speaking'), 'false');
             await page.locator('#speech-audio').evaluate(element => element.play());
             await page.waitForFunction(() => !document.querySelector('#speech-audio').paused);
             await page.locator('#speech-audio').evaluate(element => element.pause());
-            assert.match(await page.locator('#status').textContent(), /桃太郎ラボ/);
+            assert.match(await page.locator('#reply-text').textContent(), /桃太郎ラボ/);
             assert.equal(requests[index].history.length, index * 2);
             console.log(`Turn ${index + 1}: chat/TTS 200; WAV ${audio.bytes} bytes; decoded ${audio.duration}s; lip sync OK`);
         }
         await page.screenshot({ path: path.join(output, 'desktop.png'), fullPage: true });
         await page.setViewportSize({ width: 390, height: 844 });
+        assert.ok((await page.locator('#character-image').boundingBox()).width > 250);
         const layout = await page.evaluate(() => {
             const button = document.querySelector('#send-button').getBoundingClientRect();
             const input = document.querySelector('#text-input').getBoundingClientRect();
@@ -84,7 +91,8 @@ const path = require('node:path');
         assert.ok(layout.width <= layout.viewport && layout.bottom <= layout.height && layout.inputWidth > 100);
         await page.screenshot({ path: path.join(output, 'mobile.png'), fullPage: true });
         await page.reload();
-        assert.equal(await page.locator('#status').textContent(), 'Ask me something!');
+        assert.equal(await page.locator('#status').textContent(), '会話をはじめましょう');
+        await page.screenshot({ path: path.join(output, 'mobile-welcome.png'), fullPage: true });
         if (!live) {
             // Check real browser error recovery, then accept a fresh send.
             await page.unroute(`${base}/tts`);
@@ -92,8 +100,8 @@ const path = require('node:path');
             await page.fill('#text-input', '音声エラーの確認');
             await page.click('#send-button');
             await page.waitForFunction(() => document.querySelector('#audio-status').textContent.includes('TTS test failure'));
-            assert.equal(await page.locator('#status').textContent(), '桃太郎ラボ');
-            assert.equal(await page.locator('#send-button').isEnabled(), true);
+            assert.equal(await page.locator('#reply-text').textContent(), '桃太郎ラボ');
+            assert.equal(await page.locator('#text-input').isEnabled(), true);
             assert.equal(requests[2].history.length, 0, 'Reload must clear history');
             await page.unroute(`${base}/chat`);
             await page.route(`${base}/chat`, route => route.fulfill({ status: 429, json: { detail: 'Quota test failure' } }));
@@ -102,6 +110,22 @@ const path = require('node:path');
             await page.waitForFunction(() => document.querySelector('#status').textContent === 'Quota test failure');
             assert.equal(await page.locator('#text-input').inputValue(), '再試行できる入力');
             assert.equal(await page.locator('#text-input').isEnabled(), true);
+            for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 460 },
+                { width: 844, height: 390 }, { width: 768, height: 1024 }, { width: 1280, height: 600 }]) {
+                await page.setViewportSize(viewport);
+                await page.fill('#text-input', '長い入力の確認です。'.repeat(400));
+                const fits = await page.evaluate(() => {
+                    const send = document.querySelector('#send-button').getBoundingClientRect();
+                    const input = document.querySelector('#text-input').getBoundingClientRect();
+                    const character = document.querySelector('#character-image').getBoundingClientRect();
+                    return document.body.scrollWidth <= innerWidth && send.bottom <= innerHeight
+                        && input.height <= 120 && input.top >= 0 && character.height > 35;
+                });
+                assert.ok(fits, `Character and composer must fit ${viewport.width}×${viewport.height}`);
+            }
+            await page.emulateMedia({ reducedMotion: 'reduce' });
+            await page.locator('#character-viewer').evaluate(viewer => { viewer.dataset.speaking = 'true'; });
+            assert.equal(await page.locator('#character-viewer').evaluate(viewer => getComputedStyle(viewer).animationName), 'none');
         }
         assert.deepEqual(errors, []);
         console.log(`${live ? 'LIVE' : 'FIXTURE'} browser checks passed; desktop/mobile screenshots: ${output}`);
