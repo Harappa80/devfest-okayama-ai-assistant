@@ -3,16 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
-    <meta name="theme-color" content="#f7f9f8">
-    <title>AI Companion — WakuWaku</title>
+    <meta name="theme-color" content="#f8f9fa">
+    <title>AI Companion — DevFest Okayama</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="app-shell">
         <header class="app-header">
             <div class="brand">
-                <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 2.8 7.2L22 12l-7.2 2.8L12 22l-2.8-7.2L2 12l7.2-2.8Z"/></svg></span>
-                <div><h1>AI Companion</h1><p>文字で話す、声でこたえる。</p></div>
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 32 32" fill="none">
+                        <path d="M13.5 8.5 6 16l4.5 4.5" stroke="#EA4335" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M6 16l7.5 7.5" stroke="#4285F4" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M18.5 8.5 26 16l-4.5 4.5" stroke="#34A853" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M26 16l-7.5 7.5" stroke="#FBBC04" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </span>
+                <div class="brand-title-row">
+                    <h1>AI Companion</h1>
+                    <span class="devfest-pill">DevFest Okayama</span>
+                </div>
             </div>
         </header>
 
@@ -28,7 +38,7 @@
                 </div>
             </div>
             <div class="reply-bubble">
-                <p id="reply-text" tabindex="0" aria-live="polite">こんにちは。今日は、どんなお話をしましょう？</p>
+                <p id="reply-text" tabindex="0" aria-live="polite">DevFest Okayama へようこそニャ！</p>
             </div>
             <nav id="sources" aria-label="検索の出典"></nav>
             <iframe id="search-suggestions" title="Google Search suggestions" sandbox="allow-popups allow-popups-to-escape-sandbox" hidden></iframe>
