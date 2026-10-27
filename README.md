@@ -687,8 +687,6 @@ bash scripts/antigravity.sh
 
 元のコード：[Harappa80/bwai-nara-companion-python](https://github.com/Harappa80/bwai-nara-companion-python)
 
-参考画像の出典と元スライドの対応は、[画像の出典一覧](docs/images/SOURCES.md) にまとめています。
-
 ## 接続と自動検証
 
 別のターミナルでこのリポジトリに移動し、起動済みサーバーに対して実行します。実モデル利用の料金が発生します。
