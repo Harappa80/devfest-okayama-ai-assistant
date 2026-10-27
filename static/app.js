@@ -103,38 +103,43 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (sources) sources.replaceChildren();
         if (searchSuggestions) { searchSuggestions.hidden = true; searchSuggestions.srcdoc = ''; }
         let replyReceived = false;
+        let displayReply;
         try {
             const data = await post('/chat', { message, history });
-            // Render model text literally, including any HTML-like content.
-            replyText.textContent = data.response;
-            replyText.scrollTop = 0;
-            status.textContent = '返答しました';
-            if (sources) {
-                for (const source of data.sources || []) {
-                    let url;
-                    try { url = new URL(source.url); } catch { continue; }
-                    if (!['https:', 'http:'].includes(url.protocol)) continue;
-                    const link = document.createElement('a');
-                    link.href = url.href;
-                    link.textContent = source.title;
-                    link.target = '_blank';
-                    link.rel = 'noopener noreferrer';
-                    sources.append(link);
-                }
-            }
-            if (searchSuggestions && data.grounding_html) {
-                searchSuggestions.srcdoc = data.grounding_html;
-                searchSuggestions.hidden = false;
-            }
             replyReceived = true;
-            history.push({ role: 'user', text: message }, { role: 'model', text: data.response });
-            history.splice(0, Math.max(0, history.length - 20));
-            textInput.value = '';
-            updateInput();
+            displayReply = () => {
+                // Render model text literally, including any HTML-like content.
+                replyText.textContent = data.response;
+                replyText.scrollTop = 0;
+                status.textContent = '返答しました';
+                if (sources) {
+                    for (const source of data.sources || []) {
+                        let url;
+                        try { url = new URL(source.url); } catch { continue; }
+                        if (!['https:', 'http:'].includes(url.protocol)) continue;
+                        const link = document.createElement('a');
+                        link.href = url.href;
+                        link.textContent = source.title;
+                        link.target = '_blank';
+                        link.rel = 'noopener noreferrer';
+                        sources.append(link);
+                    }
+                }
+                if (searchSuggestions && data.grounding_html) {
+                    searchSuggestions.srcdoc = data.grounding_html;
+                    searchSuggestions.hidden = false;
+                }
+                history.push({ role: 'user', text: message }, { role: 'model', text: data.response });
+                history.splice(0, Math.max(0, history.length - 20));
+                textInput.value = '';
+                updateInput();
+            };
+            status.textContent = '音声を生成しています…';
             audioStatus.textContent = '音声を生成しています…';
             const speech = await post('/tts', { text: data.response, voice: voiceSelect.value || 'Kore' });
             audioUrl = URL.createObjectURL(speech);
             audio.src = audioUrl;
+            displayReply();
             audioStatus.textContent = '';
             try {
                 await audio.play();
@@ -145,6 +150,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) {
             stopLipSync();
             if (replyReceived) {
+                displayReply();
+                status.textContent = 'テキストで返答しました';
                 audioStatus.textContent = `音声を生成できませんでした: ${error.message}`;
             } else {
                 status.textContent = error.message;

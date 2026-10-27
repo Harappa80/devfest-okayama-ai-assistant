@@ -26,8 +26,14 @@ async function run(ttsFails = false, autoplayBlocked = false, stalled = false) {
                 options.signal.addEventListener('abort', () => reject(new Error('aborted')));
             }) };
             if (url === '/chat') return { ok: true, json: async () => ({ response: '<img src=x onerror=alert(1)>' }) };
+            assert.equal(elements['reply-text'].textContent, 'うーん、ちょっと考えています…', 'Reply stays hidden while generating audio');
+            assert.equal(elements.status.textContent, '音声を生成しています…');
             if (ttsFails) return { ok: false, json: async () => ({ detail: 'TTS unavailable' }) };
-            return { ok: true, blob: async () => ({}) };
+            return { ok: true, blob: async () => {
+                await Promise.resolve();
+                assert.equal(elements['reply-text'].textContent, 'うーん、ちょっと考えています…', 'Wait until the audio body is available');
+                return {};
+            } };
         },
     });
     await ready();
@@ -46,7 +52,10 @@ async function run(ttsFails = false, autoplayBlocked = false, stalled = false) {
     assert.equal(elements['reply-text'].textContent, '<img src=x onerror=alert(1)>');
     assert.equal(elements['text-input'].disabled, false);
     assert.equal(elements['send-button'].disabled, true);
-    if (ttsFails) assert.match(elements['audio-status'].textContent, /TTS unavailable/);
+    if (ttsFails) {
+        assert.match(elements['audio-status'].textContent, /TTS unavailable/);
+        assert.equal(elements.status.textContent, 'テキストで返答しました');
+    }
     else assert.equal(elements['play-audio'].hidden, !autoplayBlocked);
     if (autoplayBlocked) {
         assert.match(elements['audio-status'].textContent, /再生ボタン/);

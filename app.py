@@ -210,7 +210,10 @@ async def speech(body: SpeechRequest, client: genai.Client = Depends(get_client)
         contents=[types.Content(role="user", parts=[types.Part(text=body.text)])],
         config=types.GenerateContentConfig(
             response_modalities=["AUDIO"],
-            speech_config=types.SpeechConfig(voice_config=types.VoiceConfig(voice=body.voice)),
+            speech_config=types.SpeechConfig(
+                language_code="ja-JP",
+                voice_config=types.VoiceConfig(voice=body.voice),
+            ),
         ),
     )
     # Gemini 3.8 unary TTS returns a complete WAV container. Do not wrap it again.

@@ -72,6 +72,7 @@ def test_tts_returns_wav_without_double_header(api):
         call = sdk.aio.models.generate_content.call_args.kwargs
         assert call['model'] == 'gemini-3.8-flash-tts'
         assert call['config'].speech_config.voice_config.voice == voice
+        assert call['config'].speech_config.language_code == 'ja-JP'
     assert http.post('/tts', json={'text': 'hi', 'voice': 'unknown'}).status_code == 422
 
 
