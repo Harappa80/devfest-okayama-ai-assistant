@@ -1,4 +1,5 @@
 import io
+import importlib.util
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 import wave
@@ -59,15 +60,53 @@ def test_tts_returns_wav_without_double_header(api):
         out.writeframes(b'\0\0'*240)
     wav = buffer.getvalue()
     sdk.aio.models.generate_content.return_value = types.GenerateContentResponse(candidates=[types.Candidate(content=types.Content(parts=[types.Part(inline_data=types.Blob(mime_type='audio/wav', data=wav))]))])
-    response = http.post('/tts', json={'text': 'こんにちは', 'voice': 'Puck'})
-    assert response.status_code == 200
-    assert response.content == wav
-    assert response.headers['content-type'] == 'audio/wav'
-    assert response.headers['cache-control'] == 'no-store'
-    call = sdk.aio.models.generate_content.call_args.kwargs
-    assert call['model'] == 'gemini-3.8-flash-tts'
-    assert call['config'].speech_config.voice_config.voice == 'Puck'
+    voices = http.get('/config').json()['voices']
+    assert len(voices) == len(set(voices))
+    assert len([voice for voice in voices if not voice.startswith('voice_')]) == 30
+    for voice in voices:
+        response = http.post('/tts', json={'text': 'こんにちは', 'voice': voice})
+        assert response.status_code == 200
+        assert response.content == wav
+        assert response.headers['content-type'] == 'audio/wav'
+        assert response.headers['cache-control'] == 'no-store'
+        call = sdk.aio.models.generate_content.call_args.kwargs
+        assert call['model'] == 'gemini-3.8-flash-tts'
+        assert call['config'].speech_config.voice_config.voice == voice
     assert http.post('/tts', json={'text': 'hi', 'voice': 'unknown'}).status_code == 422
+
+
+@pytest.mark.parametrize('voice, name, expected_label, count', [
+    ('Kore', 'unused', 'Kore', 30),
+    ('voice_saved-anime', 'アニメキャラ', 'アニメキャラ', 31),
+    ('voice_saved-anime', '', 'カスタム音声', 31),
+])
+def test_configured_voice_label_default_and_tts(monkeypatch, voice, name, expected_label, count):
+    monkeypatch.setenv('GEMINI_TTS_VOICE', voice)
+    monkeypatch.setenv('GEMINI_TTS_VOICE_NAME', name)
+    spec = importlib.util.spec_from_file_location('voice_test_app', backend.__file__)
+    configured = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(configured)
+    sdk = MagicMock()
+    wav = b'RIFF' + b'\0' * 4 + b'WAVE'
+    sdk.aio.models.generate_content = AsyncMock(return_value=types.GenerateContentResponse(
+        candidates=[types.Candidate(content=types.Content(parts=[
+            types.Part(inline_data=types.Blob(mime_type='audio/wav', data=wav)),
+        ]))]))
+    configured.app.dependency_overrides[configured.get_client] = lambda: sdk
+    with TestClient(configured.app) as http:
+        config = http.get('/config').json()
+        assert len(config['voices']) == len(set(config['voices'])) == count
+        assert config['default_voice'] == voice
+        assert config['voice_labels'].get(voice, voice) == expected_label
+        schema = http.get('/openapi.json').json()['components']['schemas']['SpeechRequest']['properties']['voice']
+        assert schema['enum'] == config['voices']
+        assert schema['default'] == voice
+        for body in [{'text': 'こんにちは'}, {'text': 'こんにちは', 'voice': voice}]:
+            assert http.post('/tts', json=body).content == wav
+            assert sdk.aio.models.generate_content.call_args.kwargs['config'].speech_config.voice_config.voice == voice
+        sdk.aio.models.generate_content.reset_mock()
+        assert http.post('/tts', json={'text': 'hi', 'voice': 'voice_not-configured'}).status_code == 422
+        sdk.aio.models.generate_content.assert_not_called()
 
 
 def test_no_text_or_audio(api):
@@ -102,7 +141,7 @@ def test_no_credentials_and_static_assets():
             assert http.post('/chat', json={'message': 'hi'}).status_code == 503
             assert http.get('/').status_code == 200
             assert http.get('/static/app.js').status_code == 200
-            assert http.get('/config').json()['default_voice'] == 'Kore'
+            assert http.get('/config').json()['default_voice'] == backend.DEFAULT_VOICE
 
 
 def test_vertex_adc_is_explicit_even_with_old_environment(monkeypatch):

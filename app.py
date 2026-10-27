@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 import logging
 import os
 from pathlib import Path
+import re
 from typing import Annotated, Literal
 
 from dotenv import load_dotenv
@@ -13,7 +14,7 @@ import google.auth
 from google.auth.exceptions import GoogleAuthError
 from google import genai
 from google.genai import errors, types
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, field_validator
 
 from companion_agent import load_runner, run_turn
 
@@ -27,10 +28,20 @@ SYSTEM_INSTRUCTION = os.getenv(
     "You are WakuWaku, a friendly AI companion. Reply in the user's language. "
     "Keep answers concise and natural for spoken conversation.",
 )
-VOICES = ("Kore", "Puck", "Charon", "Fenrir", "Aoede")
+VOICES = (
+    "Achernar", "Achird", "Algenib", "Algieba", "Alnilam", "Aoede",
+    "Autonoe", "Callirrhoe", "Charon", "Despina", "Enceladus", "Erinome",
+    "Fenrir", "Gacrux", "Iapetus", "Kore", "Laomedeia", "Leda", "Orus", "Puck",
+    "Pulcherrima", "Rasalgethi", "Sadachbia", "Sadaltager", "Schedar", "Sulafat",
+    "Umbriel", "Vindemiatrix", "Zephyr", "Zubenelgenubi",
+)
 DEFAULT_VOICE = os.getenv("GEMINI_TTS_VOICE", "Kore")
+VOICE_LABELS = {}
 if DEFAULT_VOICE not in VOICES:
-    raise ValueError(f"GEMINI_TTS_VOICE must be one of: {', '.join(VOICES)}")
+    if not re.fullmatch(r"voice_[A-Za-z0-9_-]{1,128}", DEFAULT_VOICE):
+        raise ValueError("GEMINI_TTS_VOICE must be a standard voice name or a saved voice_... ID")
+    VOICES += (DEFAULT_VOICE,)
+    VOICE_LABELS[DEFAULT_VOICE] = os.getenv("GEMINI_TTS_VOICE_NAME", "").strip() or "カスタム音声"
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=8000)]
 
 
@@ -57,7 +68,15 @@ class ChatResponse(BaseModel):
 
 class SpeechRequest(BaseModel):
     text: Text
-    voice: Literal["Kore", "Puck", "Charon", "Fenrir", "Aoede"] = DEFAULT_VOICE
+    voice: str = Field(default=DEFAULT_VOICE, json_schema_extra={"enum": list(VOICES)})
+
+    @field_validator("voice")
+    @classmethod
+    def configured_voice(cls, value: str) -> str:
+        # Only offer and accept standard voices plus the configured saved voice.
+        if value not in VOICES:
+            raise ValueError("Select a configured voice")
+        return value
 
 
 @asynccontextmanager
@@ -127,7 +146,7 @@ async def index():
 
 @app.get("/config")
 async def config():
-    return {"voices": VOICES, "default_voice": DEFAULT_VOICE}
+    return {"voices": VOICES, "default_voice": DEFAULT_VOICE, "voice_labels": VOICE_LABELS}
 
 
 @app.post("/chat", response_model=ChatResponse)
