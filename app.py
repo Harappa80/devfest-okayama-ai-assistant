@@ -1,4 +1,5 @@
 """FastAPI companion: Gemini text responses and Gemini TTS audio."""
+import asyncio
 from contextlib import asynccontextmanager
 import logging
 import os
@@ -28,6 +29,7 @@ SYSTEM_INSTRUCTION = os.getenv(
     "You are WakuWaku, a friendly AI companion. Reply in the user's language. "
     "Keep answers concise and natural for spoken conversation.",
 )
+REQUEST_TIMEOUT_SECONDS = 120
 VOICES = (
     "Achernar", "Achird", "Algenib", "Algieba", "Alnilam", "Aoede",
     "Autonoe", "Callirrhoe", "Charon", "Despina", "Enceladus", "Erinome",
@@ -127,7 +129,11 @@ def get_client(request: Request) -> genai.Client:
 
 async def generate(client: genai.Client, **kwargs):
     try:
-        return await client.aio.models.generate_content(**kwargs)
+        return await asyncio.wait_for(
+            client.aio.models.generate_content(**kwargs), timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+    except TimeoutError as exc:
+        raise HTTPException(504, "Geminiの応答がタイムアウトしました。もう一度送信してください。") from exc
     except errors.APIError as exc:
         logger.warning("Gemini request failed (code=%s)", exc.code)
         if exc.code == 429:
@@ -153,7 +159,11 @@ async def config():
 async def chat(body: ChatRequest, request: Request, client: genai.Client = Depends(get_client)):
     if request.app.state.runner is not None:
         try:
-            text, grounding = await run_turn(request.app.state.runner, body)
+            text, grounding = await asyncio.wait_for(
+                run_turn(request.app.state.runner, body), timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+        except TimeoutError as exc:
+            raise HTTPException(504, "エージェントの応答がタイムアウトしました。もう一度送信してください。") from exc
         except errors.APIError as exc:
             logger.warning("ADK model request failed (code=%s)", exc.code)
             raise HTTPException(429 if exc.code == 429 else 502, "Agent request failed. Check quota and model access.") from exc
@@ -214,4 +224,4 @@ async def speech(body: SpeechRequest, client: genai.Client = Depends(get_client)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="127.0.0.1", port=int(os.getenv("PORT", "8000")))
+    uvicorn.run("app:app", host="127.0.0.1", port=int(os.getenv("PORT", "8000")), reload=True)

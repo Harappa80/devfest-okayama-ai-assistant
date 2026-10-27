@@ -60,15 +60,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const post = async (path, body) => {
-        const response = await fetch(path, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            throw new Error(typeof error.detail === 'string' ? error.detail : 'リクエストに失敗しました。');
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 150000);
+        try {
+            const response = await fetch(path, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body), signal: controller.signal,
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(typeof error.detail === 'string' ? error.detail : 'リクエストに失敗しました。');
+            }
+            return await (path === '/tts' ? response.blob() : response.json());
+        } catch (error) {
+            if (controller.signal.aborted) {
+                throw new Error('応答が時間内に届きませんでした。接続とサーバーのログを確認し、もう一度送信してください。');
+            }
+            throw error;
+        } finally {
+            clearTimeout(timer);
         }
-        return response;
     };
 
     const handleSendMessage = async () => {
@@ -93,8 +104,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (searchSuggestions) { searchSuggestions.hidden = true; searchSuggestions.srcdoc = ''; }
         let replyReceived = false;
         try {
-            const response = await post('/chat', { message, history });
-            const data = await response.json();
+            const data = await post('/chat', { message, history });
             // Render model text literally, including any HTML-like content.
             replyText.textContent = data.response;
             replyText.scrollTop = 0;
@@ -123,7 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateInput();
             audioStatus.textContent = '音声を生成しています…';
             const speech = await post('/tts', { text: data.response, voice: voiceSelect.value || 'Kore' });
-            audioUrl = URL.createObjectURL(await speech.blob());
+            audioUrl = URL.createObjectURL(speech);
             audio.src = audioUrl;
             audioStatus.textContent = '';
             try {

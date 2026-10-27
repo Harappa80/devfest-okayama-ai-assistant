@@ -129,7 +129,7 @@ def test_connection_failure(api):
     http, sdk = api
     sdk.aio.models.generate_content.side_effect = TimeoutError('private connection data')
     response = http.post('/tts', json={'text': 'hi'})
-    assert response.status_code == 502
+    assert response.status_code == 504
     assert 'private connection data' not in response.text
 
 
@@ -190,3 +190,27 @@ def test_adk_route_uses_character_and_preserves_grounding(api):
         run.assert_awaited_once()
         sdk.aio.models.generate_content.assert_not_called()
     backend.app.state.runner = None
+
+
+@pytest.mark.parametrize('agent', [False, True])
+def test_stalled_chat_returns_timeout(api, monkeypatch, agent):
+    import asyncio
+    http, sdk = api
+    cancelled = []
+
+    async def stalled(*args, **kwargs):
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.append(True)
+
+    monkeypatch.setattr(backend, 'REQUEST_TIMEOUT_SECONDS', 0.01)
+    if agent:
+        monkeypatch.setattr(backend.app.state, 'runner', SimpleNamespace(close=AsyncMock()))
+        monkeypatch.setattr(backend, 'run_turn', stalled)
+    else:
+        sdk.aio.models.generate_content.side_effect = stalled
+    response = http.post('/chat', json={'message': 'hi'})
+    assert response.status_code == 504
+    assert 'タイムアウト' in response.json()['detail']
+    assert cancelled == [True]

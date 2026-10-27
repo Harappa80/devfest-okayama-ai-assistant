@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-async function run(ttsFails = false, autoplayBlocked = false) {
+async function run(ttsFails = false, autoplayBlocked = false, stalled = false) {
     const elements = {};
     for (const id of ['text-input', 'send-button', 'character-image', 'character-viewer', 'voice-select', 'status', 'reply-text', 'speech-audio', 'audio-status', 'play-audio']) {
         elements[id] = { value: '', style: {}, dataset: {}, handlers: {}, textContent: '', hidden: false,
@@ -17,10 +17,14 @@ async function run(ttsFails = false, autoplayBlocked = false) {
         window: { addEventListener() {} },
         Option: function (text, value) { this.value = value; },
         URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
-        setInterval, clearInterval,
+        setInterval, clearInterval, AbortController, clearTimeout,
+        setTimeout: stalled ? (fn) => setTimeout(fn, 0) : setTimeout,
         fetch: async (url, options) => {
             if (url === '/config') return { ok: true, json: async () => ({ voices: ['Kore'], default_voice: 'Kore' }) };
             requests.push({ url, body: JSON.parse(options.body) });
+            if (stalled) return { ok: true, json: () => new Promise((resolve, reject) => {
+                options.signal.addEventListener('abort', () => reject(new Error('aborted')));
+            }) };
             if (url === '/chat') return { ok: true, json: async () => ({ response: '<img src=x onerror=alert(1)>' }) };
             if (ttsFails) return { ok: false, json: async () => ({ detail: 'TTS unavailable' }) };
             return { ok: true, blob: async () => ({}) };
@@ -29,6 +33,13 @@ async function run(ttsFails = false, autoplayBlocked = false) {
     await ready();
     elements['text-input'].value = 'こんにちは';
     await elements['send-button'].handlers.click();
+    if (stalled) {
+        assert.match(elements.status.textContent, /応答が時間内に届きませんでした/);
+        assert.equal(elements['text-input'].disabled, false);
+        assert.equal(elements['send-button'].disabled, false);
+        assert.equal(elements['text-input'].value, 'こんにちは');
+        return;
+    }
     assert.equal(requests[0].url, '/chat');
     assert.equal(requests[1].url, '/tts');
     assert.equal(requests[1].body.voice, 'Kore');
@@ -48,6 +59,6 @@ async function run(ttsFails = false, autoplayBlocked = false) {
     assert.equal(requests[2].body.history.length, 2);
 }
 (async () => {
-    await run(); await run(true); await run(false, true);
+    await run(); await run(true); await run(false, true); await run(false, false, true);
     console.log('UI checks passed: chat/history, TTS, literal text, TTS error, autoplay fallback.');
 })();

@@ -5,9 +5,9 @@ description = "FastAPI and Vertex AI companion workshop"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi==0.162.0",
-    "google-adk==2.13.0",
-    "google-genai==2.33.0",
+    "fastapi==0.141.1",
+    "google-adk==2.12.0",
+    "google-genai==2.31.0",
     "python-dotenv==1.2.4",
     "uvicorn==0.54.0",
 ]
@@ -20,6 +20,8 @@ dev = [
 
 [tool.uv]
 package = false
+# Supply-chain cooldown: exclude artifacts uploaded within the last week.
+exclude-newer = "1 week"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
