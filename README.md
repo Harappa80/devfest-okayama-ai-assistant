@@ -249,11 +249,10 @@ agy --version
 export GOOGLE_CLOUD_PROJECT='自分のプロジェクトID'
 export GOOGLE_CLOUD_LOCATION=global
 export AGY_ADC_AUTH=true
-bash scripts/antigravity.sh -p 'ファイルを変更せず、このリポジトリの構成を日本語で簡潔に説明してください。' --output-format json
-bash scripts/antigravity.sh
+agy --mode auto
 ```
 
-コード説明が出ることを確認します。スクリプトの既定モデルはCLI側のID `gemini-3.8-flash-medium` です。`agy models` で確認し、環境でIDが異なる場合は `ANTIGRAVITY_MODEL` でGemini 3.8 FlashのIDを指定できます。CLIはアプリの `.env` を読み込みません。以前APIキー用の `modelProvider: "gemini"` を設定した場合は、その指定をCLI設定から削除してADC認証に戻してください。[認証の公式手順](https://antigravity.google/docs/install?tab=cli)。
+資料と同じく `agy --mode auto` でCLIを直接起動します。CLIはアプリの `.env` を読み込みません。以前APIキー用の `modelProvider: "gemini"` を設定した場合は、その指定をCLI設定から削除してADC認証に戻してください。[認証の公式手順](https://antigravity.google/docs/install?tab=cli)。
 
 CLIが起動している間は日本語の指示文を入力します。上の `agy --version` などのコマンドは通常のBashに入力します。
 
@@ -631,7 +630,7 @@ uv run --locked uvicorn app:app --host 0.0.0.0 --port 8000
 ```bash
 cd ~/devfest-okayama-ai-assistant
 uv sync --locked
-bash scripts/antigravity.sh
+agy --mode auto
 ```
 
 ## 余裕があれば、もうひと工夫
@@ -687,23 +686,14 @@ bash scripts/antigravity.sh
 
 元のコード：[Harappa80/bwai-nara-companion-python](https://github.com/Harappa80/bwai-nara-companion-python)
 
-## 接続と自動検証
-
-別のターミナルでこのリポジトリに移動し、起動済みサーバーに対して実行します。実モデル利用の料金が発生します。
-
-```bash
-uv run --locked python scripts/check_connection.py
-```
-
-`character.py` 作成前はオウム返しとTTS、作成後はGemini会話とTTSを確認します。手順どおりの完成例は `examples/character_basic.py` と `examples/character_search.py` にあります。CLIでの生成が難しい場合は、それぞれを `character.py` にコピーして再起動できます。
-
 ## 開発用の自動検証
+
+以下はアプリを保守するためのテストです。参加者がハンズオン中に実行する必要はありません。
 
 ```bash
 uv sync --locked
 uv run --locked pytest -q
 node tests/test_ui.cjs
-bash -n scripts/antigravity.sh
 ```
 
 実ブラウザ検証は、起動済みサーバーに対して実行します。
@@ -716,6 +706,6 @@ npm run test:e2e
 LIVE_GEMINI=1 npm run test:e2e
 ```
 
-既存のChromiumを使う場合は `CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e` と指定できます。スクリーンショットは既定で `/tmp/companion-e2e` に保存されます。既定のブラウザテストはAI応答のみfixtureにし、画面、音声デコード、口パク、履歴、障害復旧を確認します。実行結果と未検証の範囲は [検証記録](docs/verification.md) に記載しています。
+既存のChromiumを使う場合は `CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e` と指定できます。スクリーンショットは既定で `/tmp/companion-e2e` に保存されます。既定のブラウザテストはAI応答のみfixtureにし、画面、音声デコード、口パク、履歴、障害復旧を確認します。
 
 依存を変更する開発作業では `uv add パッケージ名`（開発用は `uv add --dev パッケージ名`）を使い、`pyproject.toml` と `uv.lock` を一緒にcommitします。
