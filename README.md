@@ -6,7 +6,7 @@
 
 ## 進め方
 
-1. [準備する](#step-1)：Vertex AIとADCを設定し、Cloud Shellを開く
+1. [準備する](#step-1)：Agent PlatformとADCを設定し、Cloud Shellを開く
 2. [サンプルを動かす](#step-2)：コードを取得し、ブラウザーで表示する
 3. [AI と会話できるようにする](#step-3)：Antigravity CLI で `character.py` を作る
 4. [性格と口調を変える](#step-4)：自分だけのキャラクターにする
@@ -25,7 +25,7 @@
 
 Cloud ShellにGoogle Cloudの利用権限を持つアカウントでログインします。画像生成でGeminiアプリを使う場合は、利用可能なアカウントで開いてください。
 
-会話・音声・Google検索はVertex AIから利用します。課金が有効なプロジェクトを用意し、[Vertex AIの料金](https://cloud.google.com/vertex-ai/generative-ai/pricing)を確認してください。会話は `gemini-3.8-flash`、音声は `gemini-3.8-flash-tts` です。
+会話・音声・Google検索はAgent Platformから利用します。課金が有効なプロジェクトを用意し、[Agent Platformの料金](https://cloud.google.com/vertex-ai/generative-ai/pricing)を確認してください。会話は `gemini-3.8-flash`、音声は `gemini-3.8-flash-tts` です。
 
 ### コマンドと指示文の違い
 
@@ -46,9 +46,15 @@ Cloud ShellにGoogle Cloudの利用権限を持つアカウントでログイン
 
 ## 1. 準備する
 
-### 1-1. Vertex AIとADCを準備する
+### 1-1. Agent PlatformとADCを準備する
 
-[Google Cloud Console](https://console.cloud.google.com/)で課金が有効なプロジェクトを選択し、次の1-2でCloud Shellを開いてから実行します。
+[Google Cloud Console](https://console.cloud.google.com/)で課金が有効なプロジェクトを選択し、スライドと同じ手順でAPIを有効化します。
+
+1. 検索窓に「Agent Platform」と入力します。
+2. 「Agent Platform」のコンソール画面を開きます。
+3. 「Enable APIs」→「有効にする」をクリックし、有効化が完了するまで待ちます。
+
+続いて、次の1-2でCloud Shellを開いてから以下を実行します。`gcloud services enable` は、画面でAPIを有効化済みであれば省略できます。
 
 ```bash
 export GOOGLE_CLOUD_PROJECT='自分のプロジェクトID'
@@ -131,7 +137,7 @@ uvが `.venv` を作り、`uv.lock` に記録されたバージョンの依存�
 
 インストールがエラーなく完了してから次に進みます。既存チェックアウトを更新する場合も、`git pull --ff-only origin main` の後に `uv sync --locked` を実行してください。
 
-### 2-3. Vertex AIの設定ファイルを作る
+### 2-3. Agent Platformの設定ファイルを作る
 
 初回だけ実行します。再実行すると設定を上書きするため、再開時はコピー不要です。
 
@@ -148,7 +154,7 @@ set_key('.env', 'GOOGLE_CLOUD_PROJECT', project)
 PYTHON
 ```
 
-Cloud Shellエディターで `.env` を開き、プロジェクトIDと `GOOGLE_CLOUD_LOCATION=global` を確認します。モデル名、TTSの声 `Kore`、最初のオウム返し用の `COMPANION_MODE=echo` はひな形のままです。設定はVertex AI＋ADCのみです。
+Cloud Shellエディターで `.env` を開き、プロジェクトIDと `GOOGLE_CLOUD_LOCATION=global` を確認します。モデル名、TTSの声 `Kore`、最初のオウム返し用の `COMPANION_MODE=echo` はひな形のままです。設定はAgent Platform＋ADCのみです。
 
 既存の環境変数は `.env` より優先されます。`.env` の変更後はサーバーを再起動してください。
 
@@ -166,7 +172,7 @@ uv run --locked uvicorn app:app --host 0.0.0.0 --port 8000
 
 サーバーが動いている間、このターミナルにはアクセスログが表示されます。**入力待ちに戻らないのは正常です。そのまま起動しておきます。**
 
-このコマンドはFastAPIアプリをポート8000で起動します。最初の画面は入力をオウム返ししますが、読み上げは最初からVertex AIのGemini TTSを利用します。
+このコマンドはFastAPIアプリをポート8000で起動します。最初の画面は入力をオウム返ししますが、読み上げは最初からAgent PlatformのGemini TTSを利用します。
 
 ### 2-5. ブラウザーで表示する
 
@@ -188,9 +194,9 @@ Cloud Shell の右上にある、青いターミナルアイコンの右隣の�
 
 [Gemini TTSの標準音声30種類](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/text-to-speech/overview#prebuilt-voices)をアルファベット順に表示します。初期値は `Kore` で、`.env` の `GEMINI_TTS_VOICE` から変更できます。
 
-Vertex AIに保存したカスタム音声を使う場合は、`.env` の `GEMINI_TTS_VOICE` をその音声ID（`voice_...`）に変更し、`GEMINI_TTS_VOICE_NAME=アニメキャラ` のように表示名を設定してください。アプリを再起動してページを再読み込みすると、標準30音声に追加され、初期選択になります。表示名を省略すると「カスタム音声」と表示します。
+Agent Platformに保存したカスタム音声を使う場合は、`.env` の `GEMINI_TTS_VOICE` をその音声ID（`voice_...`）に変更し、`GEMINI_TTS_VOICE_NAME=アニメキャラ` のように表示名を設定してください。アプリを再起動してページを再読み込みすると、標準30音声に追加され、初期選択になります。表示名を省略すると「カスタム音声」と表示します。
 
-音声一覧はアプリの設定を `/config` から読み込んで表示します。Vertex AIに保存しただけでは自動追加されません。`GOOGLE_CLOUD_PROJECT` と `GOOGLE_CLOUD_LOCATION` は音声を保存したプロジェクト・ロケーションに合わせ、その音声を利用できるADCで起動してください。
+音声一覧はアプリの設定を `/config` から読み込んで表示します。Agent Platformに保存しただけでは自動追加されません。`GOOGLE_CLOUD_PROJECT` と `GOOGLE_CLOUD_LOCATION` は音声を保存したプロジェクト・ロケーションに合わせ、その音声を利用できるADCで起動してください。
 
 1. 音声の選択欄で `Kore` を選びます。日本語の文章は日本語で読み上げます。
 2. 入力欄に「こんにちは！」と入力します。
@@ -309,7 +315,7 @@ root_agent = LlmAgent(
 
 Antigravity CLI でうまく作れない場合は、エディターで `character.py` を新規作成し、このコード全体を貼り付けて保存しても進められます。
 
-> このアプリは `character.py` のADKエージェントを読み込み、会話とTTSに同じVertex AIのADC認証を使用します。モデルは `.env` の `GEMINI_MODEL=gemini-3.8-flash` を使います。`character.py` の編集後はサーバーを再起動してください。
+> このアプリは `character.py` のADKエージェントを読み込み、会話とTTSに同じAgent PlatformのADC認証を使用します。モデルは `.env` の `GEMINI_MODEL=gemini-3.8-flash` を使います。`character.py` の編集後はサーバーを再起動してください。
 
 ### 3-4. AI の返答を確認する
 
@@ -653,7 +659,7 @@ agy --mode auto
 | 症状 | 確認事項 |
 | --- | --- |
 | 503／認証未設定 | `.env` の実際のプロジェクトID、ADC、起動ディレクトリ。設定後に再起動 |
-| 502／モデル呼び出し失敗 | サーバーログ、Vertex AI API有効化、実行者／SAの権限、モデル利用可否、`global`リージョン |
+| 502／モデル呼び出し失敗 | サーバーログ、Agent Platform API有効化、実行者／SAの権限、モデル利用可否、`global`リージョン |
 | 429 | プロジェクトのクォータを確認し、時間を置いて再送信 |
 | `agy` が見つからない | `agy --version` と `PATH`、必要な場合のみ公式インストール |
 | CLIだけ認証に失敗 | 同じターミナルの `AGY_ADC_AUTH=true`、`GOOGLE_CLOUD_PROJECT`。CLIはアプリの `.env` を読み込まない |
@@ -662,7 +668,7 @@ agy --mode auto
 
 <a id="voice-trouble"></a>
 
-音声はブラウザー内蔵TTSではなく、Vertex AIのGemini TTSです。音声生成に失敗しても会話のテキストは残ります。自動再生がブロックされた場合は「音声を再生」を押してください。タブのミュート、端末の音量も確認してください。
+音声はブラウザー内蔵TTSではなく、Agent PlatformのGemini TTSです。音声生成に失敗しても会話のテキストは残ります。自動再生がブロックされた場合は「音声を再生」を押してください。タブのミュート、端末の音量も確認してください。
 
 ## ファイルの役割
 
@@ -670,7 +676,7 @@ agy --mode auto
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `app.py`               | ブラウザーからのメッセージを受け取る Web サーバー。`COMPANION_MODE=echo`で `character.py` がなければオウム返しし、作成後はADKエージェントを呼び出します。 |
 | `character.py`         | ハンズオンで作成するファイル。モデル、名前、性格、利用するツールを設定します。                                               |
-| `.env`                 | Vertex AIのプロジェクト・モデル・音声を設定するファイル。                                                                            |
+| `.env`                 | Agent Platformのプロジェクト・モデル・音声を設定するファイル。                                                                            |
 | `.env.template`        | `.env` を作るためのひな形です。                                                                                              |
 | `pyproject.toml`     | Pythonの要件とアプリ・開発用の依存関係です。                                                                   |
 | `uv.lock` | すべての依存パッケージの解決結果です。リポジトリで共有します。 |
@@ -702,7 +708,7 @@ node tests/test_ui.cjs
 npm ci
 npx playwright install chromium
 npm run test:e2e
-# 実際のVertex AIを使う検証（モデル利用料金が発生）
+# 実際のAgent Platformを使う検証（モデル利用料金が発生）
 LIVE_GEMINI=1 npm run test:e2e
 ```
 
