@@ -1,4 +1,4 @@
-# DevFest Okayama：自分だけの AI アシスタントを作ろう
+# Devfest Okayama 2026 - ADKとAntigravityで自分だけのAIアシスタントを作ろう！
 
 キャラクターと会話できる Web アプリを、Antigravity CLI に手伝ってもらいながら作るハンズオンです。ブラウザーで操作できる **Cloud Shell** を使います。手元のパソコンへの Python のインストールは不要です。
 
