@@ -1,4 +1,4 @@
-# DevFest Okayama：自分だけの AI アシスタントを作ろう
+# Devfest Okayama 2026 - ADKとAntigravityで自分だけのAIアシスタントを作ろう！
 
 キャラクターと会話できる Web アプリを、Antigravity CLI に手伝ってもらいながら作るハンズオンです。ブラウザーで操作できる **Cloud Shell** を使います。手元のパソコンへの Python のインストールは不要です。
 
@@ -6,7 +6,7 @@
 
 ## 進め方
 
-1. [準備する](#step-1)：Vertex AIとADCを設定し、Cloud Shellを開く
+1. [準備する](#step-1)：Agent PlatformのAPIを有効化し、Cloud Shellを開く
 2. [サンプルを動かす](#step-2)：コードを取得し、ブラウザーで表示する
 3. [AI と会話できるようにする](#step-3)：Antigravity CLI で `character.py` を作る
 4. [性格と口調を変える](#step-4)：自分だけのキャラクターにする
@@ -25,7 +25,7 @@
 
 Cloud ShellにGoogle Cloudの利用権限を持つアカウントでログインします。画像生成でGeminiアプリを使う場合は、利用可能なアカウントで開いてください。
 
-会話・音声・Google検索はVertex AIから利用します。課金が有効なプロジェクトを用意し、[Vertex AIの料金](https://cloud.google.com/vertex-ai/generative-ai/pricing)を確認してください。会話は `gemini-3.8-flash`、音声は `gemini-3.8-flash-tts` です。
+会話・音声・Google検索はAgent Platformから利用します。課金が有効なプロジェクトを用意し、[Agent Platformの料金](https://cloud.google.com/vertex-ai/generative-ai/pricing)を確認してください。会話は `gemini-3.8-flash`、音声は `gemini-3.8-flash-tts` です。
 
 ### コマンドと指示文の違い
 
@@ -40,25 +40,21 @@ Cloud ShellにGoogle Cloudの利用権限を持つアカウントでログイン
 
 ターミナルのコマンドは、コード枠の中身を **1 行ずつ貼り付けて Enter** で実行してください。コマンドの前に `$` を付ける必要はありません。
 
-画面例は元のハンズオン資料から抜粋しています。画像内に旧CLIの画面、旧フォルダー名 `bwai-nara-companion-python` や以前のモデル名・ポート番号が写っている場合があります。**入力する値やコマンドは、この README の本文に従ってください。** ボタンやファイルの位置を探すときに画像を使います。
+実習の順序は Devfest Okayama 2026 のスライドに合わせています。WebアプリはAgent PlatformとApplication Default Credentials（ADC）を使い、開発用のAntigravity CLIはGoogleアカウントでログインします。この2つの認証は別です。
 
 <a id="step-1"></a>
 
 ## 1. 準備する
 
-### 1-1. Vertex AIとADCを準備する
+### 1-1. Agent PlatformのAPIを有効化する
 
-[Google Cloud Console](https://console.cloud.google.com/)で課金が有効なプロジェクトを選択し、次の1-2でCloud Shellを開いてから実行します。
+[Google Cloud Console](https://console.cloud.google.com/)で課金が有効なプロジェクトを選択し、スライドと同じ手順でAPIを有効化します。
 
-```bash
-export GOOGLE_CLOUD_PROJECT='自分のプロジェクトID'
-gcloud config set project "$GOOGLE_CLOUD_PROJECT"
-gcloud services enable aiplatform.googleapis.com --project "$GOOGLE_CLOUD_PROJECT"
-export GOOGLE_CLOUD_LOCATION=global
-export AGY_ADC_AUTH=true
-```
+1. 検索窓に「Agent Platform」と入力します。
+2. 「Agent Platform」のコンソール画面を開きます。
+3. 「Enable APIs」→「有効にする」をクリックし、有効化が完了するまで待ちます。
 
-Cloud Shellではログイン済みユーザーのADCを使います。承認画面が出たら承認してください。APIキーは使用しません。実行者には利用するプロジェクトの `roles/aiplatform.user` と、クォータプロジェクトの `roles/serviceusage.serviceUsageConsumer` が必要です。API有効化には `serviceusage.services.enable` 権限が必要です。既に有効な場合は有効化を省略できます。
+次の手順で開くCloud Shellでは、Webアプリがログイン済みユーザーのADCを使います。承認画面が出たら承認してください。APIキーは使用しません。実行者には利用するプロジェクトの `roles/aiplatform.user` と、クォータプロジェクトの `roles/serviceusage.serviceUsageConsumer` が必要です。API有効化には `serviceusage.services.enable` 権限が必要です。既に有効な場合は有効化を省略できます。
 
 既存のSA／Workload Identityを接続した環境では、そのADCを使います。SAキーは発行しません。ローカル開発でSAを偽装する場合のみ、実行者に対象SAの `roles/iam.serviceAccountTokenCreator` を付け、次を実行します。
 
@@ -75,6 +71,7 @@ gcloud auth application-default login --impersonate-service-account=YOUR_SA@YOUR
 2. Google アカウントでログインします。
 3. 初回の説明や承認画面が表示された場合は、内容を確認して進みます。
 4. 画面下部のターミナルに、文字を入力できる状態になるまで待ちます。
+5. Cloud Shellの「新しいタブで開く」から全画面で表示します。
 
 承認を求められた場合は、「承認」から進みます。
 
@@ -131,24 +128,17 @@ uvが `.venv` を作り、`uv.lock` に記録されたバージョンの依存�
 
 インストールがエラーなく完了してから次に進みます。既存チェックアウトを更新する場合も、`git pull --ff-only origin main` の後に `uv sync --locked` を実行してください。
 
-### 2-3. Vertex AIの設定ファイルを作る
+### 2-3. Agent Platformの設定ファイルを作る
 
-初回だけ実行します。再実行すると設定を上書きするため、再開時はコピー不要です。
+`your-project-id` を自分のGoogle CloudプロジェクトIDに置き換えて、初回だけ実行します。再実行すると設定を上書きするため、再開時はコピー不要です。
 
 ```bash
 cp .env.template .env
+sed -i 's/^GOOGLE_CLOUD_PROJECT=.*/GOOGLE_CLOUD_PROJECT=your-project-id/' .env
 chmod 600 .env
-uv run --locked python - <<'PYTHON'
-import os
-from dotenv import set_key
-project = os.environ.get('GOOGLE_CLOUD_PROJECT', '')
-if not project or project == '自分のプロジェクトID':
-    raise SystemExit('先に実際のGOOGLE_CLOUD_PROJECTを設定してください')
-set_key('.env', 'GOOGLE_CLOUD_PROJECT', project)
-PYTHON
 ```
 
-Cloud Shellエディターで `.env` を開き、プロジェクトIDと `GOOGLE_CLOUD_LOCATION=global` を確認します。モデル名、TTSの声 `Kore`、最初のオウム返し用の `COMPANION_MODE=echo` はひな形のままです。設定はVertex AI＋ADCのみです。
+Cloud Shellエディターで `.env` を開き、プロジェクトIDと `GOOGLE_CLOUD_LOCATION=global` を確認します。モデル名、TTSの声 `Kore`、最初のオウム返し用の `COMPANION_MODE=echo` はひな形のままです。設定はAgent Platform＋ADCのみです。`.env.template` の `GOOGLE_GENAI_USE_VERTEXAI` やコード内の `vertexai=True` はSDKの識別子なので、Agent Platformという画面上の名称に合わせて変更しないでください。
 
 既存の環境変数は `.env` より優先されます。`.env` の変更後はサーバーを再起動してください。
 
@@ -159,14 +149,14 @@ Cloud Shellエディターで `.env` を開き、プロジェクトIDと `GOOGLE
 次のコマンドを実行します。以降も、起動には同じコマンドを使います。
 
 ```bash
-uv run --locked uvicorn app:app --host 0.0.0.0 --port 8000
+uv run --locked python app.py
 ```
 
-`Uvicorn running on http://0.0.0.0:8000` と `Application startup complete.`が表示されれば成功です。
+`Uvicorn running on http://127.0.0.1:8000` と `Application startup complete.`が表示されれば成功です。
 
 サーバーが動いている間、このターミナルにはアクセスログが表示されます。**入力待ちに戻らないのは正常です。そのまま起動しておきます。**
 
-このコマンドはFastAPIアプリをポート8000で起動します。最初の画面は入力をオウム返ししますが、読み上げは最初からVertex AIのGemini TTSを利用します。
+このコマンドはFastAPIアプリを既定のポート8000で起動します。別の用途で `PORT` 環境変数を設定している場合は、起動前に `unset PORT` で解除してください。最初の画面は入力をオウム返ししますが、読み上げは最初からAgent PlatformのGemini TTSを利用します。
 
 ### 2-5. ブラウザーで表示する
 
@@ -182,15 +172,15 @@ Cloud Shell の右上にある、青いターミナルアイコンの右隣の�
 
 **操作場所：** アプリのプレビュー画面。
 
-現在の画面は白ベースで、中央に大きなキャラクター、その下に返答の吹き出しと入力欄があります。入力欄の下段左側でGemini TTSの声を選び、右側の矢印で送信します。以下は配置の参考となる旧画面です。
+現在の画面は白ベースで、中央に大きなキャラクター、その下に返答の吹き出しと入力欄があります。入力欄の下段左側でGemini TTSの声を選び、右側の矢印で送信します。
 
 入力はテキストのみです。マイク入力・音声認識は使いません。「読み上げ」の選択欄は、キャラクターが返答する声を切り替えるものです。
 
 [Gemini TTSの標準音声30種類](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/text-to-speech/overview#prebuilt-voices)をアルファベット順に表示します。初期値は `Kore` で、`.env` の `GEMINI_TTS_VOICE` から変更できます。
 
-Vertex AIに保存したカスタム音声を使う場合は、`.env` の `GEMINI_TTS_VOICE` をその音声ID（`voice_...`）に変更し、`GEMINI_TTS_VOICE_NAME=アニメキャラ` のように表示名を設定してください。アプリを再起動してページを再読み込みすると、標準30音声に追加され、初期選択になります。表示名を省略すると「カスタム音声」と表示します。
+Agent Platformに保存したカスタム音声を使う場合は、`.env` の `GEMINI_TTS_VOICE` をその音声ID（`voice_...`）に変更し、`GEMINI_TTS_VOICE_NAME=アニメキャラ` のように表示名を設定してください。アプリを再起動してページを再読み込みすると、標準30音声に追加され、初期選択になります。表示名を省略すると「カスタム音声」と表示します。
 
-音声一覧はアプリの設定を `/config` から読み込んで表示します。Vertex AIに保存しただけでは自動追加されません。`GOOGLE_CLOUD_PROJECT` と `GOOGLE_CLOUD_LOCATION` は音声を保存したプロジェクト・ロケーションに合わせ、その音声を利用できるADCで起動してください。
+音声一覧はアプリの設定を `/config` から読み込んで表示します。Agent Platformに保存しただけでは自動追加されません。`GOOGLE_CLOUD_PROJECT` と `GOOGLE_CLOUD_LOCATION` は音声を保存したプロジェクト・ロケーションに合わせ、その音声を利用できるADCで起動してください。
 
 1. 音声の選択欄で `Kore` を選びます。日本語の文章は日本語で読み上げます。
 2. 入力欄に「こんにちは！」と入力します。
@@ -231,7 +221,6 @@ Cloud Shellでは、まず既存のCLIを確認します。
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 agy --version
-agy models
 ```
 
 `command not found` の場合のみ[公式インストール手順](https://antigravity.google/docs/getting-started?tab=cli)に従います。
@@ -243,16 +232,17 @@ export PATH="$HOME/.local/bin:$PATH"
 agy --version
 ```
 
-新しいターミナルでもプロジェクト・リージョン・ADC認証を設定してからCLIを起動します。
+資料35〜37枚目と同じく、CLIを起動してGoogleアカウントでログインします。以前ADCでCLIを使った場合は、このターミナルで `unset AGY_ADC_AUTH` を実行してから進めます。
 
 ```bash
-export GOOGLE_CLOUD_PROJECT='自分のプロジェクトID'
-export GOOGLE_CLOUD_LOCATION=global
-export AGY_ADC_AUTH=true
 agy --mode auto
 ```
 
-資料と同じく `agy --mode auto` でCLIを直接起動します。CLIはアプリの `.env` を読み込みません。以前APIキー用の `modelProvider: "gemini"` を設定した場合は、その指定をCLI設定から削除してADC認証に戻してください。[認証の公式手順](https://antigravity.google/docs/install?tab=cli)。
+1. サインイン方法が表示されたら「Other sign-in options」を選びます。
+2. 表示されたURLをブラウザーで開き、Googleアカウントでログインします。
+3. 表示された認証コードをコピーし、ターミナルの認証コード入力欄に貼り付けてEnterを押します。
+
+ログイン済みの場合は認証画面が省略されることがあります。表示はCLIのバージョンにより異なります。[公式の認証手順](https://antigravity.google/docs/install?tab=cli)も参照してください。以前APIキー用の `modelProvider: "gemini"` を設定した場合は、その指定をCLI設定から削除してアカウント認証に戻します。Webアプリ側の `.env` とADCの設定はそのまま使います。
 
 CLIが起動している間は日本語の指示文を入力します。上の `agy --version` などのコマンドは通常のBashに入力します。
 
@@ -309,7 +299,7 @@ root_agent = LlmAgent(
 
 Antigravity CLI でうまく作れない場合は、エディターで `character.py` を新規作成し、このコード全体を貼り付けて保存しても進められます。
 
-> このアプリは `character.py` のADKエージェントを読み込み、会話とTTSに同じVertex AIのADC認証を使用します。モデルは `.env` の `GEMINI_MODEL=gemini-3.8-flash` を使います。`character.py` の編集後はサーバーを再起動してください。
+> このアプリは `character.py` のADKエージェントを読み込み、会話とTTSに同じAgent PlatformのADC認証を使用します。実際に使う会話モデルは `companion_agent.py` が `.env` の `GEMINI_MODEL=gemini-3.8-flash`（環境変数の指定があればそちら）で上書きします。モデルを変更する場合は、`character.py` とこの設定値をそろえてください。`character.py` の編集後はサーバーを再起動してください。
 
 ### 3-4. AI の返答を確認する
 
@@ -318,7 +308,7 @@ Antigravity CLI でうまく作れない場合は、エディターで `characte
 サーバーが停止していることを確認し、再び起動します。
 
 ```bash
-uv run --locked uvicorn app:app --host 0.0.0.0 --port 8000
+uv run --locked python app.py
 ```
 
 プレビュー画面を再読み込みし、次のように話しかけます。
@@ -329,11 +319,11 @@ uv run --locked uvicorn app:app --host 0.0.0.0 --port 8000
 
 **オウム返しではなく、質問に対する返答が表示されれば成功です。**
 
-API の応答には時間がかかります。`Thinking...` の表示中は、続けて送信せずに待ちます。
+API の応答には時間がかかります。「返答を考えています…」の表示中は、続けて送信せずに待ちます。
 
 確認できたら、ターミナル 1 で `Ctrl+C` を押して停止します。
 
-> 以降は「編集 → 保存 → サーバーを起動 → プレビューを再読み込み → 会話 → `Ctrl+C` で停止」の順で進めます。この起動方法では、コードの変更は自動で反映されません。また、サーバーを再起動すると、それまでの会話履歴はリセットされます。
+> 以降は「編集 → 保存 → サーバーを起動 → プレビューを再読み込み → 会話 → `Ctrl+C` で停止」の順で進めます。`python app.py` はPythonファイルの変更を検知して再起動しますが、この手順では停止した状態で編集し、保存後に起動します。`.env` の変更後も手動で再起動してください。会話履歴はブラウザー内に保持され、プレビューの再読み込みでリセットされます。
 
 <a id="step-4"></a>
 
@@ -384,7 +374,7 @@ model、name、その他のファイルは変更しないでください。
 **ターミナル 1** で起動します。
 
 ```bash
-uv run --locked uvicorn app:app --host 0.0.0.0 --port 8000
+uv run --locked python app.py
 ```
 
 プレビューを再読み込みし、「自己紹介して」「好きなことを教えて」などと話しかけます。
@@ -465,7 +455,7 @@ google_search で調べてから答えてください。
 **ターミナル 1** で起動します。
 
 ```bash
-uv run --locked uvicorn app:app --host 0.0.0.0 --port 8000
+uv run --locked python app.py
 ```
 
 プレビューを再読み込みし、次のように質問します。`YYYY年MM月DD日` は、ハンズオン当日の日付に置き換えてください。
@@ -487,7 +477,31 @@ uv run --locked uvicorn app:app --host 0.0.0.0 --port 8000
 
 このアプリは「口を閉じた画像」と「口を開いた画像」の 2 枚を切り替えて、話しているように見せています。同じキャラクターで、顔の位置・大きさ・背景をそろえた 2 枚を用意しましょう。
 
-### 6-1. 口を閉じた画像を作る
+### 6-1. Antigravity CLIで2枚の画像を生成する
+
+**操作場所：** ターミナル 2 の Antigravity CLI の入力欄。
+
+スライド62枚目と同じく、Nano Banana 2で2枚の画像を生成し、配置と参照先の変更まで依頼します。キャラクターの外見は好きなものに変えてください。
+
+```text
+Nano Banana 2を使用して、アニメ調の女の子のマスコットキャラクターを生成してください。
+黒猫の耳と長い黒髪で、親しみやすく明るい目にしてください。
+正面を向いた頭から肩までのポートレート、背景は単色の白、画像は正方形にしてください。
+リップシンク用に口が開いた画像と閉じた画像の2枚を作成してください。
+口以外の箇所は変更しないでください。
+口を閉じた画像をGemini_Generated_Image_close.png、
+口を開いた画像をGemini_Generated_Image_open.pngとしてstatic/images/に配置してください。
+templates/index.htmlのcharacter-imageの初期画像と、
+static/app.jsのclosedMouthImg、openMouthImgを新しい画像のパスに変更してください。
+ブラウザーから参照するパスは/static/images/で始めてください。
+画像の参照先以外の機能は変更しないでください。
+```
+
+2枚が作成されたら、[6-4の確認箇所](#avatar-references)を確認し、6-5へ進みます。CLIで画像生成を利用できない場合は、以下の代替手順で画像を用意できます。
+
+### 6-2. 代替手順：Geminiアプリで2枚の画像を作る
+
+#### 口を閉じた画像
 
 **操作場所：** [Gemini アプリ](https://gemini.google.com/app)。
 
@@ -502,7 +516,7 @@ AI アシスタントのアバター用に、親しみやすい猫のマスコ�
 文字や吹き出しは入れないでください。
 ```
 
-### 6-2. 口を開いた画像を作る
+#### 口を開いた画像
 
 同じ会話で、生成された画像を元にして追加で依頼します。
 
@@ -516,7 +530,7 @@ AI アシスタントのアバター用に、親しみやすい猫のマスコ�
 
 アプリに配置するときは、スクリーンショットではなく、生成された画像そのものをダウンロードしてください。
 
-### 6-3. 画像を保存してアップロードする
+### 6-3. 代替手順：画像を保存してアップロードする
 
 2 枚の画像を手元のパソコンにダウンロードし、次の名前で保存します。
 
@@ -545,7 +559,11 @@ devfest-okayama-ai-assistant/
 
 エディターのファイル一覧で、`static` → `images` の中に、新しい 2 枚が並んでいることを確認します。
 
-### 6-4. アプリで使う画像を変更する
+<a id="avatar-references"></a>
+
+### 6-4. アプリで使う画像を変更・確認する
+
+6-1で参照先も変更済みなら、以下の依頼は省略し、3か所の確認だけを行います。
 
 **操作場所：** ターミナル 2 の Antigravity CLI の入力欄。
 
@@ -571,7 +589,7 @@ static/app.js の closedMouthImg と openMouthImg も、新しい画像のパス
 <img
   id="character-image"
   src="/static/images/Gemini_Generated_Image_close.png"
-  alt="WakuWaku"
+  alt="AIアシスタントのアバター"
 />
 ```
 
@@ -589,7 +607,7 @@ const closedMouthImg = "/static/images/Gemini_Generated_Image_close.png";
 **ターミナル 1** で起動します。
 
 ```bash
-uv run --locked uvicorn app:app --host 0.0.0.0 --port 8000
+uv run --locked python app.py
 ```
 
 プレビューを再読み込みしてから、会話します。
@@ -620,7 +638,7 @@ Cloud Shell を開き、ターミナル 1 で次のコマンドを実行しま�
 ```bash
 cd ~/devfest-okayama-ai-assistant
 uv sync --locked
-uv run --locked uvicorn app:app --host 0.0.0.0 --port 8000
+uv run --locked python app.py
 ```
 
 その後、ポート `8000` のウェブプレビューを開きます。**ファイルが残っていれば、再度の `git clone` や `.env` のコピーは不要です。**
@@ -653,24 +671,25 @@ agy --mode auto
 | 症状 | 確認事項 |
 | --- | --- |
 | 503／認証未設定 | `.env` の実際のプロジェクトID、ADC、起動ディレクトリ。設定後に再起動 |
-| 502／モデル呼び出し失敗 | サーバーログ、Vertex AI API有効化、実行者／SAの権限、モデル利用可否、`global`リージョン |
+| 502／モデル呼び出し失敗 | サーバーログ、Agent Platform API有効化、実行者／SAの権限、モデル利用可否、`global`リージョン |
 | 429 | プロジェクトのクォータを確認し、時間を置いて再送信 |
 | `agy` が見つからない | `agy --version` と `PATH`、必要な場合のみ公式インストール |
-| CLIだけ認証に失敗 | 同じターミナルの `AGY_ADC_AUTH=true`、`GOOGLE_CLOUD_PROJECT`。CLIはアプリの `.env` を読み込まない |
+| CLIだけ認証に失敗 | Googleアカウントのログイン状態を確認。以前のADC設定やAPIキー用プロバイダー設定が残っていないか、3-1の手順を確認 |
 | プレビューが開かない | サーバー稼働、ポート8000、Cloud ShellのWeb preview |
 | 声が出ない | 自動再生がブロックされた場合に出る「音声を再生」ボタン、ブラウザのミュート、端末音量。音声エラーの表示も確認 |
 
 <a id="voice-trouble"></a>
 
-音声はブラウザー内蔵TTSではなく、Vertex AIのGemini TTSです。音声生成に失敗しても会話のテキストは残ります。自動再生がブロックされた場合は「音声を再生」を押してください。タブのミュート、端末の音量も確認してください。
+音声はブラウザー内蔵TTSではなく、Agent PlatformのGemini TTSです。音声生成に失敗しても会話のテキストは残ります。自動再生がブロックされた場合は「音声を再生」を押してください。タブのミュート、端末の音量も確認してください。
 
 ## ファイルの役割
 
 | ファイル・フォルダー   | 役割                                                                                                                         |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `app.py`               | ブラウザーからのメッセージを受け取る Web サーバー。`COMPANION_MODE=echo`で `character.py` がなければオウム返しし、作成後はADKエージェントを呼び出します。 |
+| `companion_agent.py` | `character.py` の読み込み、会話モデルの設定、履歴と検索結果の処理を行います。 |
 | `character.py`         | ハンズオンで作成するファイル。モデル、名前、性格、利用するツールを設定します。                                               |
-| `.env`                 | Vertex AIのプロジェクト・モデル・音声を設定するファイル。                                                                            |
+| `.env`                 | Agent Platformのプロジェクト・モデル・音声を設定するファイル。                                                                            |
 | `.env.template`        | `.env` を作るためのひな形です。                                                                                              |
 | `pyproject.toml`     | Pythonの要件とアプリ・開発用の依存関係です。                                                                   |
 | `uv.lock` | すべての依存パッケージの解決結果です。リポジトリで共有します。 |
@@ -682,7 +701,9 @@ agy --mode auto
 
 ## 元になった資料
 
-この README は、[Build with AI — ADK と Gemini CLI で自分だけの AI アシスタントを作ろう！](https://docs.google.com/presentation/d/1nKmorvq0PVMgfLKNIPDbciXQHFEJGNkVYjW7FbSMtQQ/edit) の実習手順を、このリポジトリ向けに整理したものです。
+現在の実習手順は「Devfest Okayama 2026 - ADKとAntigravityで自分だけのAIアシスタントを作ろう！」に合わせています。
+
+元になった資料：[Build with AI — ADK と Gemini CLI で自分だけの AI アシスタントを作ろう！](https://docs.google.com/presentation/d/1nKmorvq0PVMgfLKNIPDbciXQHFEJGNkVYjW7FbSMtQQ/edit)。
 
 元のコード：[Harappa80/bwai-nara-companion-python](https://github.com/Harappa80/bwai-nara-companion-python)
 
@@ -702,7 +723,7 @@ node tests/test_ui.cjs
 npm ci
 npx playwright install chromium
 npm run test:e2e
-# 実際のVertex AIを使う検証（モデル利用料金が発生）
+# 実際のAgent Platformを使う検証（モデル利用料金が発生）
 LIVE_GEMINI=1 npm run test:e2e
 ```
 
