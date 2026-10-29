@@ -1,5 +1,4 @@
 import asyncio
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -9,7 +8,17 @@ from app import ChatRequest, chat_result
 
 
 def test_character_load_uses_vertex_client(tmp_path):
-    code = (Path(__file__).parents[1] / 'examples/character_search.py').read_text()
+    code = """
+from google.adk.agents import LlmAgent
+from google.adk.tools import google_search
+
+root_agent = LlmAgent(
+    model='gemini-3.8-flash',
+    name='companion_agent',
+    instruction='あなたは猫のワクです。最新情報はGoogle検索で調べてください。',
+    tools=[google_search],
+)
+"""
     (tmp_path / 'character.py').write_text(code)
     from google import genai
     from google.auth.credentials import AnonymousCredentials
