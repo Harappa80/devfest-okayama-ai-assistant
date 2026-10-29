@@ -699,14 +699,6 @@ agy --mode auto
 | `static/style.css`     | 色や配置など、画面の見た目を設定します。                                                                                     |
 | `static/images/`       | キャラクターの画像を置きます。                                                                                               |
 
-## 元になった資料
-
-現在の実習手順は「Devfest Okayama 2026 - ADKとAntigravityで自分だけのAIアシスタントを作ろう！」に合わせています。
-
-元になった資料：[Build with AI — ADK と Gemini CLI で自分だけの AI アシスタントを作ろう！](https://docs.google.com/presentation/d/1nKmorvq0PVMgfLKNIPDbciXQHFEJGNkVYjW7FbSMtQQ/edit)。
-
-元のコード：[Harappa80/bwai-nara-companion-python](https://github.com/Harappa80/bwai-nara-companion-python)
-
 ## 開発用の自動検証
 
 以下はアプリを保守するためのテストです。参加者がハンズオン中に実行する必要はありません。
