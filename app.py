@@ -37,7 +37,7 @@ VOICES = (
     "Pulcherrima", "Rasalgethi", "Sadachbia", "Sadaltager", "Schedar", "Sulafat",
     "Umbriel", "Vindemiatrix", "Zephyr", "Zubenelgenubi",
 )
-DEFAULT_VOICE = os.getenv("GEMINI_TTS_VOICE", "Kore")
+DEFAULT_VOICE = os.getenv("GEMINI_TTS_VOICE", "Leda")
 VOICE_LABELS = {}
 if DEFAULT_VOICE not in VOICES:
     if not re.fullmatch(r"voice_[A-Za-z0-9_-]{1,128}", DEFAULT_VOICE):

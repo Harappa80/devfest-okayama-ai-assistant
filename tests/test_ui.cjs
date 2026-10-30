@@ -35,7 +35,7 @@ async function run(ttsFails = false, autoplayBlocked = false, stalled = false, i
         setInterval, clearInterval, AbortController, clearTimeout,
         setTimeout: stalled ? (fn) => setTimeout(fn, 0) : setTimeout,
         fetch: async (url, options) => {
-            if (url === '/config') return { ok: true, json: async () => ({ voices: ['Kore'], default_voice: 'Kore' }) };
+            if (url === '/config') return { ok: true, json: async () => ({ voices: ['Leda'], default_voice: 'Leda' }) };
             requests.push({ url, body: JSON.parse(options.body) });
             if (stalled) return { ok: true, json: () => new Promise((resolve, reject) => {
                 options.signal.addEventListener('abort', () => reject(new Error('aborted')));
@@ -64,7 +64,7 @@ async function run(ttsFails = false, autoplayBlocked = false, stalled = false, i
     }
     assert.equal(requests[0].url, '/chat');
     assert.equal(requests[1].url, '/tts');
-    assert.equal(requests[1].body.voice, 'Kore');
+    assert.equal(requests[1].body.voice, 'Leda');
     assert.equal(elements['reply-text'].textContent, '<img src=x onerror=alert(1)>');
     assert.equal(elements['text-input'].disabled, false);
     assert.equal(elements['send-button'].disabled, true);

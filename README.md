@@ -138,7 +138,7 @@ sed -i 's/^GOOGLE_CLOUD_PROJECT=.*/GOOGLE_CLOUD_PROJECT=your-project-id/' .env
 chmod 600 .env
 ```
 
-Cloud Shellエディターで `.env` を開き、プロジェクトIDと `GOOGLE_CLOUD_LOCATION=global` を確認します。モデル名、TTSの声 `Kore`、最初のオウム返し用の `COMPANION_MODE=echo` はひな形のままです。設定はAgent Platform＋ADCのみです。`.env.template` の `GOOGLE_GENAI_USE_VERTEXAI` やコード内の `vertexai=True` はSDKの識別子なので、Agent Platformという画面上の名称に合わせて変更しないでください。
+Cloud Shellエディターで `.env` を開き、プロジェクトIDと `GOOGLE_CLOUD_LOCATION=global` を確認します。モデル名、TTSの声 `Leda`、最初のオウム返し用の `COMPANION_MODE=echo` はひな形のままです。設定はAgent Platform＋ADCのみです。`.env.template` の `GOOGLE_GENAI_USE_VERTEXAI` やコード内の `vertexai=True` はSDKの識別子なので、Agent Platformという画面上の名称に合わせて変更しないでください。
 
 既存の環境変数は `.env` より優先されます。`.env` の変更後はサーバーを再起動してください。
 
@@ -176,13 +176,13 @@ Cloud Shell の右上にある、青いターミナルアイコンの右隣の�
 
 入力はテキストのみです。マイク入力・音声認識は使いません。「読み上げ」の選択欄は、キャラクターが返答する声を切り替えるものです。
 
-[Gemini TTSの標準音声30種類](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/text-to-speech/overview#prebuilt-voices)をアルファベット順に表示します。初期値は `Kore` で、`.env` の `GEMINI_TTS_VOICE` から変更できます。
+[Gemini TTSの標準音声30種類](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/text-to-speech/overview#prebuilt-voices)をアルファベット順に表示します。初期値は `Leda` で、`.env` の `GEMINI_TTS_VOICE` から変更できます。
 
 Agent Platformに保存したカスタム音声を使う場合は、`.env` の `GEMINI_TTS_VOICE` をその音声ID（`voice_...`）に変更し、`GEMINI_TTS_VOICE_NAME=アニメキャラ` のように表示名を設定してください。アプリを再起動してページを再読み込みすると、標準30音声に追加され、初期選択になります。表示名を省略すると「カスタム音声」と表示します。
 
 音声一覧はアプリの設定を `/config` から読み込んで表示します。Agent Platformに保存しただけでは自動追加されません。`GOOGLE_CLOUD_PROJECT` と `GOOGLE_CLOUD_LOCATION` は音声を保存したプロジェクト・ロケーションに合わせ、その音声を利用できるADCで起動してください。
 
-1. 音声の選択欄で `Kore` を選びます。日本語の文章は日本語で読み上げます。
+1. 音声の選択欄で `Leda` を選びます。日本語の文章は日本語で読み上げます。
 2. 入力欄に「こんにちは！」と入力します。
 3. 右側の送信ボタンを押します。Enter でも送信できます。改行は Shift+Enter です。
 

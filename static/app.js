@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
             status.textContent = '音声を生成しています…';
             audioStatus.textContent = '音声を生成しています…';
-            const speech = await post('/tts', { text: data.response, voice: voiceSelect.value || 'Kore' });
+            const speech = await post('/tts', { text: data.response, voice: voiceSelect.value || 'Leda' });
             audioUrl = URL.createObjectURL(speech);
             audio.src = audioUrl;
             displayReply();
