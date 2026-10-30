@@ -13,6 +13,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const searchSuggestions = document.getElementById('search-suggestions');
     const openMouthImg = '/static/images/char-mouth-open.png';
     const closedMouthImg = '/static/images/char-mouth-closed.png';
+    // Start loading both frames immediately and retain them for mouth animation.
+    const mouthImages = [closedMouthImg, openMouthImg].map(src => {
+        const image = new Image();
+        image.src = src;
+        return image;
+    });
+    // A missing frame must not prevent speech playback.
+    const mouthImagesReady = Promise.allSettled(mouthImages.map(image => image.decode()));
     const history = [];
     let busy = false;
     let lipSyncInterval;
@@ -36,6 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // A one-time action only when the browser blocks automatic playback.
     playAudio.addEventListener('click', async () => {
         try {
+            await mouthImagesReady;
             await audio.play();
             playAudio.hidden = true;
             audioStatus.textContent = '';
@@ -142,6 +151,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             displayReply();
             audioStatus.textContent = '';
             try {
+                await mouthImagesReady;
                 await audio.play();
             } catch {
                 audioStatus.textContent = '自動再生がブロックされました。再生ボタンを押してください。';

@@ -1,13 +1,18 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-async function run(ttsFails = false, autoplayBlocked = false, stalled = false) {
+async function run(ttsFails = false, autoplayBlocked = false, stalled = false, imageFails = false) {
+    const imageSources = [];
+    let imagesSettled = 0;
     const elements = {};
     for (const id of ['text-input', 'send-button', 'character-image', 'character-viewer', 'voice-select', 'status', 'reply-text', 'speech-audio', 'audio-status', 'play-audio']) {
         elements[id] = { value: '', style: {}, dataset: {}, handlers: {}, textContent: '', hidden: false,
             addEventListener(name, fn) { this.handlers[name] = fn; },
             replaceChildren() {}, removeAttribute() {}, pause() {},
-            play: async () => { if (autoplayBlocked) throw new Error('autoplay blocked'); },
+            play: async () => {
+                assert.equal(imagesSettled, 2, 'Playback waits for both mouth frames to finish decoding');
+                if (autoplayBlocked) throw new Error('autoplay blocked');
+            },
         };
     }
     const requests = [];
@@ -16,6 +21,16 @@ async function run(ttsFails = false, autoplayBlocked = false, stalled = false) {
         document: { getElementById: id => elements[id], addEventListener: (_, fn) => { ready = fn; } },
         window: { addEventListener() {} },
         Option: function (text, value) { this.value = value; },
+        Image: class {
+            set src(value) { imageSources.push(value); }
+            decode() {
+                return new Promise((resolve, reject) => setImmediate(() => {
+                    imagesSettled++;
+                    if (imageFails) reject(new Error('Image unavailable'));
+                    else resolve();
+                }));
+            }
+        },
         URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
         setInterval, clearInterval, AbortController, clearTimeout,
         setTimeout: stalled ? (fn) => setTimeout(fn, 0) : setTimeout,
@@ -37,6 +52,7 @@ async function run(ttsFails = false, autoplayBlocked = false, stalled = false) {
         },
     });
     await ready();
+    assert.deepEqual(imageSources, ['/static/images/char-mouth-closed.png', '/static/images/char-mouth-open.png'], 'Both frames preload before the first message');
     elements['text-input'].value = 'こんにちは';
     await elements['send-button'].handlers.click();
     if (stalled) {
@@ -69,5 +85,6 @@ async function run(ttsFails = false, autoplayBlocked = false, stalled = false) {
 }
 (async () => {
     await run(); await run(true); await run(false, true); await run(false, false, true);
-    console.log('UI checks passed: chat/history, TTS, literal text, TTS error, autoplay fallback.');
+    await run(false, false, false, true);
+    console.log('UI checks passed: chat/history, TTS, literal text, TTS error, autoplay fallback, image preload and failure fallback.');
 })();
